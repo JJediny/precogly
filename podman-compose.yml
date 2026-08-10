@@ -1,0 +1,58 @@
+version: "3.8"
+
+services:
+  db:
+    image: docker.io/library/postgres:16-alpine
+    container_name: precogly-postgres
+    # Rootless podman on hosts without subuid/subgid delegation only has a
+    # single-UID namespace. Map the container's postgres user (uid/gid 70)
+    # to the host user so volume writes succeed without setuid helpers.
+    # Docker ignores unknown keys and Docker Compose has its own equivalent
+    # (`userns_mode`), which we set for parity.
+    userns_mode: "keep-id:uid=70,gid=70"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-precogly}
+      POSTGRES_USER: ${POSTGRES_USER:-precogly}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-precogly_dev_password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-precogly} -d ${POSTGRES_DB:-precogly}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      target: dev
+    container_name: precogly-backend
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-precogly}:${POSTGRES_PASSWORD:-precogly_dev_password}@db:5432/${POSTGRES_DB:-precogly}
+      DJANGO_SETTINGS_MODULE: config.settings.development
+      ALLOWED_HOSTS: localhost,127.0.0.1,0.0.0.0,backend
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-key-change-in-production}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      target: dev
+    container_name: precogly-frontend
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_URL: http://localhost:8000
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:

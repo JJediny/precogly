@@ -5,6 +5,13 @@ import type { Node, Rect, Viewport } from '@xyflow/react'
 const PADDING = 50
 const IMAGE_SCALE = 2 // 2x resolution for crisp output
 
+export interface ExportImageOptions {
+  /** Solid background color; omitted = transparent background. */
+  backgroundColor?: string
+  /** Node/edge ids to leave out of the capture (bounds and DOM). */
+  excludeIds?: Set<string>
+}
+
 /** Filter that excludes React Flow UI overlays from image capture. */
 function overlayFilter(node: HTMLElement): boolean {
   if (!node.classList) return true
@@ -80,20 +87,26 @@ export async function exportDiagramImage(
   getViewport: () => Viewport,
   setViewport: (viewport: Viewport, options?: { duration?: number }) => void,
   getNodesBounds: (nodes: Node[]) => Rect,
+  options?: ExportImageOptions,
 ): Promise<void> {
-  await withExportViewport(wrapperElement, nodes, getViewport, setViewport, getNodesBounds, async (reactFlowElement, paddedBounds) => {
-    const imageWidth = paddedBounds.width * IMAGE_SCALE
-    const imageHeight = paddedBounds.height * IMAGE_SCALE
+  const excludeIds = options?.excludeIds
+  const exportNodes = excludeIds ? nodes.filter((node) => !excludeIds.has(node.id)) : nodes
+  const filter = excludeIds
+    ? (node: HTMLElement) => overlayFilter(node) && !excludeIds.has(node.getAttribute?.('data-id') ?? '')
+    : overlayFilter
 
+  await withExportViewport(wrapperElement, exportNodes, getViewport, setViewport, getNodesBounds, async (reactFlowElement, paddedBounds) => {
     const convertFn = format === 'png' ? toPng : toSvg
     const dataUrl = await convertFn(reactFlowElement, {
-      width: imageWidth,
-      height: imageHeight,
+      width: paddedBounds.width,
+      height: paddedBounds.height,
+      pixelRatio: IMAGE_SCALE, // ignored by toSvg
+      backgroundColor: options?.backgroundColor,
       style: {
         width: `${paddedBounds.width}px`,
         height: `${paddedBounds.height}px`,
       },
-      filter: overlayFilter,
+      filter,
     })
 
     const extension = format === 'png' ? 'png' : 'svg'
@@ -118,12 +131,10 @@ export async function captureDiagramImage(
   getNodesBounds: (nodes: Node[]) => Rect,
 ): Promise<Uint8Array> {
   return withExportViewport(wrapperElement, nodes, getViewport, setViewport, getNodesBounds, async (reactFlowElement, paddedBounds) => {
-    const imageWidth = paddedBounds.width * IMAGE_SCALE
-    const imageHeight = paddedBounds.height * IMAGE_SCALE
-
     const dataUrl = await toPng(reactFlowElement, {
-      width: imageWidth,
-      height: imageHeight,
+      width: paddedBounds.width,
+      height: paddedBounds.height,
+      pixelRatio: IMAGE_SCALE,
       style: {
         width: `${paddedBounds.width}px`,
         height: `${paddedBounds.height}px`,

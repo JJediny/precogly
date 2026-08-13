@@ -23,7 +23,7 @@ import { useParentRelationships } from '@/features/dfd-editor/hooks/useParentRel
 import { useKeyboardShortcuts } from '@/features/dfd-editor/hooks/useKeyboardShortcuts'
 import { useConnectionMode } from '@/features/dfd-editor/hooks/useConnectionMode'
 import { useBoundaryMode } from '@/features/dfd-editor/hooks/useBoundaryMode'
-import { exportDiagramImage, captureDiagramImage } from '@/features/dfd-editor/lib/export-diagram-image'
+import { exportDiagramImage, captureDiagramImage, type ExportImageOptions } from '@/features/dfd-editor/lib/export-diagram-image'
 import type {
   DiagramNode,
   DiagramEdge,
@@ -163,13 +163,13 @@ function GuestDFDEditorContent() {
 
   // Register export image handler so the header can call it
   useEffect(() => {
-    exportImageRef.current = (format: 'png' | 'svg') => {
+    exportImageRef.current = (format: 'png' | 'svg', options?: ExportImageOptions) => {
       if (!reactFlowWrapper.current) return
       const filename = (title || 'diagram')
         .replace(/[^a-zA-Z0-9-_ ]/g, '')
         .replace(/\s+/g, '-')
         .toLowerCase()
-      exportDiagramImage(format, filename, reactFlowWrapper.current, nodes, getViewport, setViewport, getNodesBounds)
+      return exportDiagramImage(format, filename, reactFlowWrapper.current, nodes, getViewport, setViewport, getNodesBounds, options)
     }
     return () => { exportImageRef.current = null }
   }, [exportImageRef, title, nodes, getViewport, setViewport])
@@ -317,7 +317,7 @@ function GuestDFDEditorContent() {
         hideAnalyzeThreats
         notationStyle={notationStyle}
         onNotationChange={handleNotationChange}
-        onExportImage={(format) => exportImageRef.current?.(format)}
+        onExportImage={(format, options) => exportImageRef.current?.(format, options)}
       />
 
       <div className="flex flex-1 overflow-hidden">

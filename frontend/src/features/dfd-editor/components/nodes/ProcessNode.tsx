@@ -93,7 +93,9 @@ export const ProcessNode = memo(function ProcessNode({
       <ProcessHandles />
       <div
         className={cn(
-          'w-full h-full border-2 transition-all',
+          'w-full border-2 transition-all',
+          // Containers stay fixed to the node bounds; leaves grow with wrapped labels like actor nodes
+          isContainer ? 'h-full' : 'min-h-full',
           isContainer
             ? cn(
                 'rounded-lg border-solid',
@@ -153,7 +155,7 @@ export const ProcessNode = memo(function ProcessNode({
               nodeId={id}
               label={data.label}
               isEditing={data.isInlineEditing}
-              className="font-medium text-xs text-blue-900 truncate max-w-[90%] text-center px-1"
+              className="font-medium text-xs text-blue-900 line-clamp-6 break-words max-w-[90%] text-center px-1"
               inputClassName="max-w-[90%] text-xs text-blue-900 text-center"
             />
             {data.technology && (
@@ -182,7 +184,7 @@ export const ProcessNode = memo(function ProcessNode({
                   nodeId={id}
                   label={data.label}
                   isEditing={data.isInlineEditing}
-                  className="font-medium text-sm text-blue-900 truncate"
+                  className="font-medium text-sm text-blue-900 line-clamp-6 break-words"
                   inputClassName="text-sm text-blue-900 w-full"
                 />
                 {data.technology && (

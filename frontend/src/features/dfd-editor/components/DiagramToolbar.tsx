@@ -1,13 +1,8 @@
-import { memo, useCallback } from 'react'
+import { memo, useCallback, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import type { XYPosition } from '@xyflow/react'
 import { User, Server, Cog, Database, Shield, Box, ArrowUp, LayoutTemplate, ShieldAlert, ShieldCheck, ImageDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { Separator } from '@/components/ui/separator'
 import {
   Select,
@@ -24,9 +19,12 @@ import {
 } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { OwlMark } from '@/features/ai/components/OwlMark'
+import { AI_PROVIDER_SETTINGS_PATH } from '@/features/ai/constants'
 import type { DiagramNodeType } from '../types'
 import type { DFDNotationStyle } from '../types/notation'
 import { useCreateNode } from '../hooks/useCreateNode'
+import { ExportImageDialog } from './ExportImageDialog'
+import type { ExportImageOptions } from '../lib/export-diagram-image'
 
 interface DiagramToolbarProps {
   connectionMode: boolean
@@ -42,7 +40,8 @@ interface DiagramToolbarProps {
   hideGenerateDFD?: boolean
   notationStyle?: DFDNotationStyle
   onNotationChange?: (notation: DFDNotationStyle) => void
-  onExportImage?: (format: 'png' | 'svg') => void
+  onExportImage?: (format: 'png' | 'svg', options?: ExportImageOptions) => void | Promise<void>
+  aiAvailable?: boolean
 }
 
 interface ToolbarButtonConfig {
@@ -113,8 +112,11 @@ export const DiagramToolbar = memo(function DiagramToolbar({
   notationStyle = 'dfd3',
   onNotationChange,
   onExportImage,
+  aiAvailable = true,
 }: DiagramToolbarProps) {
+  const navigate = useNavigate()
   const { createNode } = useCreateNode(notationStyle)
+  const [exportDialogOpen, setExportDialogOpen] = useState(false)
 
   const handleAddNode = useCallback(
     (type: DiagramNodeType) => {
@@ -261,18 +263,24 @@ export const DiagramToolbar = memo(function DiagramToolbar({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="gap-2"
-                  onClick={onOpenGenerateDFD}
+                  className={cn('gap-2', !aiAvailable && 'text-muted-foreground')}
+                  onClick={aiAvailable ? onOpenGenerateDFD : () => navigate(AI_PROVIDER_SETTINGS_PATH)}
                 >
                   <OwlMark className="h-4 w-4" />
                   <span className="hidden sm:inline">Generate</span>
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">
-                <p className="font-medium">Generate DFD with AI</p>
-                <p className="text-xs text-muted-foreground">
-                  Upload an architecture diagram and let AI build a DFD
-                </p>
+                {aiAvailable ? (
+                  <>
+                    <p className="font-medium">Generate DFD with AI</p>
+                    <p className="text-xs text-muted-foreground">
+                      Upload an architecture diagram and let AI build a DFD
+                    </p>
+                  </>
+                ) : (
+                  <p>Set up an AI provider to use this</p>
+                )}
               </TooltipContent>
             </Tooltip>
           </>
@@ -307,27 +315,25 @@ export const DiagramToolbar = memo(function DiagramToolbar({
 
         {onExportImage && (
           <div className="ml-auto">
-            <DropdownMenu>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="gap-2">
-                      <ImageDown className="h-4 w-4" />
-                      <span className="hidden sm:inline">Export Image</span>
-                    </Button>
-                  </DropdownMenuTrigger>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">Download diagram as PNG or SVG</TooltipContent>
-              </Tooltip>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => onExportImage('png')}>
-                  Download as PNG
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onExportImage('svg')}>
-                  Download as SVG
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="gap-2"
+                  onClick={() => setExportDialogOpen(true)}
+                >
+                  <ImageDown className="h-4 w-4" />
+                  <span className="hidden sm:inline">Export Image</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">Download diagram as PNG or SVG</TooltipContent>
+            </Tooltip>
+            <ExportImageDialog
+              open={exportDialogOpen}
+              onOpenChange={setExportDialogOpen}
+              onExport={onExportImage}
+            />
           </div>
         )}
       </div>

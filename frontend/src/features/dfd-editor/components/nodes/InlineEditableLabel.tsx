@@ -98,7 +98,7 @@ export const InlineEditableLabel = memo(function InlineEditableLabel({
   }, [])
 
   if (!isEditing) {
-    return <span className={className}>{label}</span>
+    return <span title={label} className={className}>{label}</span>
   }
 
   return (

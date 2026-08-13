@@ -61,6 +61,7 @@ function withEdgeThreatBadge<P extends EdgeProps>(EdgeComponent: ComponentType<P
         {count > 0 && (
           <EdgeLabelRenderer>
             <div
+              data-id={props.id}
               className="absolute pointer-events-none nodrag nopan"
               style={{
                 left: (props.sourceX + props.targetX) / 2,

@@ -104,6 +104,7 @@ export const TrustBoundaryEdge = memo(function TrustBoundaryEdge({
 
       <EdgeLabelRenderer>
         <div
+          data-id={id}
           className={cn(
             'absolute pointer-events-auto nodrag nopan flex items-center gap-1.5',
             'transform -translate-x-1/2 transition-opacity',

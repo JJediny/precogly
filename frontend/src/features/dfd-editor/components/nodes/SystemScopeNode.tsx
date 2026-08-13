@@ -92,7 +92,7 @@ export const SystemScopeNode = memo(function SystemScopeNode({
 
       <div
         className={cn(
-          'w-full h-full rounded-lg border-2 border-solid bg-slate-50/50 transition-all',
+          'w-full h-full rounded-lg border-2 border-solid bg-slate-500/10 transition-all',
           selected ? 'border-slate-500' : 'border-slate-300',
           isNewlyInserted && 'ring-2 ring-green-400 ring-offset-2',
           showLockAnimation && 'animate-lock-pulse ring-2 ring-orange-400 ring-offset-2'

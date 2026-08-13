@@ -13,7 +13,7 @@ import {
   addEdge,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { ArrowLeft, Save, Clock, Loader2, Pencil, Trash2, ShieldAlert, LayoutTemplate } from 'lucide-react'
+import { ArrowLeft, Save, Clock, Loader2, Pencil, Trash2, ShieldAlert } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DeleteDFDDialog } from '@/features/threat-models/components'
 import {
@@ -33,7 +33,7 @@ import { useThreatModelThreats } from '@/features/threat-models/api/threats'
 import { TrustBoundaryEdgeEditPanel } from './components/panels/TrustBoundaryEdgeEditPanel'
 import { TemplateBrowser } from './components/TemplateBrowser'
 import { GenerateDFDDialog } from './components/GenerateDFDDialog'
-import { OwlMark } from '@/features/ai/components/OwlMark'
+import { useDfdAiAvailability } from './api/generate-dfd'
 import { CanvasOverlays } from './components/CanvasOverlays'
 import { DFDNotationProvider } from './context/DFDNotationContext'
 import { useDiagramState } from './hooks/useDiagramState'
@@ -44,7 +44,7 @@ import { useBoundaryMode } from './hooks/useBoundaryMode'
 import type { DiagramNode, DiagramEdge, DataFlowEdge, TrustBoundaryEdge } from './types'
 import { useCreateNode, useHandleDrop } from './hooks/useCreateNode'
 import { type DFDNotationStyle, NOTATION_NODE_SIZES } from './types/notation'
-import { exportDiagramImage } from './lib/export-diagram-image'
+import { exportDiagramImage, type ExportImageOptions } from './lib/export-diagram-image'
 
 function DFDEditorContent() {
   const { diagramId, id: threatModelId } = useParams<{ id: string; diagramId: string }>()
@@ -141,6 +141,10 @@ function DFDEditorContent() {
 
   // Fetch threat data for canvas badges and threat sections
   const { data: threatData } = useThreatModelThreats(threatModelId)
+
+  // AI availability for Generate DFD button
+  const { data: aiAvailability } = useDfdAiAvailability(threatModelId)
+  const aiAvailable = aiAvailability?.available ?? false
 
   // Parent relationship detection
   const { updateParentRelationships } = useParentRelationships()
@@ -426,13 +430,13 @@ function DFDEditorContent() {
 
   // Export diagram as image
   const handleExportImage = useCallback(
-    (format: 'png' | 'svg') => {
+    (format: 'png' | 'svg', options?: ExportImageOptions) => {
       if (!reactFlowWrapper.current) return
       const filename = (diagramTitle || 'diagram')
         .replace(/[^a-zA-Z0-9-_ ]/g, '')
         .replace(/\s+/g, '-')
         .toLowerCase()
-      exportDiagramImage(format, filename, reactFlowWrapper.current, nodes, getViewport, setViewport, getNodesBounds)
+      return exportDiagramImage(format, filename, reactFlowWrapper.current, nodes, getViewport, setViewport, getNodesBounds, options)
     },
     [diagramTitle, nodes, getViewport, setViewport]
   )
@@ -585,6 +589,7 @@ function DFDEditorContent() {
         getCanvasCenterPosition={getCanvasCenterPosition}
         onOpenTemplates={() => setShowTemplates(true)}
         onOpenGenerateDFD={() => setShowGenerateDFD(true)}
+        aiAvailable={aiAvailable}
         onOpenThreatAnalysis={() => {}}
         hideAnalyzeThreats
         notationStyle={notationStyle}
@@ -640,32 +645,6 @@ function DFDEditorContent() {
               <Background gap={15} size={1} />
               <Controls />
 
-              {/* Empty canvas CTA */}
-              {nodes.length === 0 && (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-                  <div className="pointer-events-auto bg-background/95 border rounded-xl shadow-lg p-8 text-center max-w-sm">
-                    <h3 className="text-lg font-semibold mb-2">
-                      Start building your DFD
-                    </h3>
-                    <p className="text-sm text-muted-foreground mb-6">
-                      Drag nodes from the toolbar, use a template, or let AI generate a diagram from your architecture.
-                    </p>
-                    <div className="flex gap-3 justify-center">
-                      <Button
-                        variant="outline"
-                        onClick={() => setShowTemplates(true)}
-                      >
-                        <LayoutTemplate className="h-4 w-4 mr-2" />
-                        Use Template
-                      </Button>
-                      <Button onClick={() => setShowGenerateDFD(true)}>
-                        <OwlMark className="h-4 w-4 mr-2" />
-                        Generate with AI
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              )}
             </ReactFlow>
           </DFDNotationProvider>
         </div>

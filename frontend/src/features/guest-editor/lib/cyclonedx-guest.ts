@@ -231,6 +231,8 @@ export function serializeGuestToCycloneDx(
   blueprint.visualizations = [visualization]
 
   // --- Build controls from countermeasures ---
+  // Map countermeasure ID → control object for direct lookup (avoids name collisions)
+  const countermeasureIdToControl = new Map<string, CycloneDxControl>()
   const controls: CycloneDxControl[] = countermeasures.map((c) => {
     const bomRef = refGen.generate('control', c.name || 'control')
     const control: CycloneDxControl = {
@@ -245,6 +247,7 @@ export function serializeGuestToCycloneDx(
     const threatRef = threatIdToBomRef.get(c.threatId)
     if (threatRef) control.mitigations = [threatRef]
 
+    countermeasureIdToControl.set(c.id, control)
     return control
   })
 
@@ -293,11 +296,7 @@ export function serializeGuestToCycloneDx(
     // Link mitigations from countermeasures that reference this threat
     const mitigationRefs = countermeasures
       .filter((c) => c.threatId === threat.id)
-      .map((c) => {
-        // Find control bom-ref by looking through controls array
-        const matchingControl = controls.find((ctrl) => ctrl.name === c.name)
-        return matchingControl?.['bom-ref']
-      })
+      .map((c) => countermeasureIdToControl.get(c.id)?.['bom-ref'])
       .filter((ref): ref is string => ref != null)
     if (mitigationRefs.length) abstractThreat.mitigations = mitigationRefs
 
@@ -320,7 +319,7 @@ export function serializeGuestToCycloneDx(
   for (const countermeasure of countermeasures) {
     const threatRef = threatIdToBomRef.get(countermeasure.threatId)
     if (threatRef) {
-      const matchingControl = controls.find((ctrl) => ctrl.name === countermeasure.name)
+      const matchingControl = countermeasureIdToControl.get(countermeasure.id)
       if (matchingControl && !matchingControl.mitigations?.length) {
         matchingControl.mitigations = [threatRef]
       }
@@ -476,12 +475,18 @@ function deserializeFromVisualization(
     }
   )
 
+  // Build abstract threat bom-ref -> GuestThreat.id mapping from scenarios
+  const threatBomRefToGuestId = new Map<string, string>()
+  for (let i = 0; i < scenariosArray.length; i++) {
+    threatBomRefToGuestId.set(scenariosArray[i].threat, threats[i].id)
+  }
+
   // Reconstruct countermeasures from controls
   const controlsArray = (document.controls ?? []) as CycloneDxControl[]
   const countermeasures = reconstructCountermeasures(
     controlsArray,
     abstractThreats,
-    threats
+    threatBomRefToGuestId
   )
 
   return {
@@ -695,12 +700,18 @@ function deserializeFromStructure(
     }
   )
 
+  // Build abstract threat bom-ref -> GuestThreat.id mapping from scenarios
+  const threatBomRefToGuestId = new Map<string, string>()
+  for (let i = 0; i < scenariosArray.length; i++) {
+    threatBomRefToGuestId.set(scenariosArray[i].threat, threats[i].id)
+  }
+
   // --- Reconstruct countermeasures ---
   const controlsArray = (document.controls ?? []) as CycloneDxControl[]
   const countermeasures = reconstructCountermeasures(
     controlsArray,
     abstractThreats,
-    threats
+    threatBomRefToGuestId
   )
 
   // --- Reconstruct system context from blueprint fields ---
@@ -753,14 +764,8 @@ function deserializeFromStructure(
 function reconstructCountermeasures(
   controlsArray: CycloneDxControl[],
   abstractThreats: CycloneDxThreat[],
-  guestThreats: GuestThreat[]
+  threatBomRefToGuestId: Map<string, string>
 ): GuestCountermeasure[] {
-  // Build abstract threat bom-ref -> GuestThreat.id mapping
-  // Match by name since IDs differ between formats
-  const threatNameToId = new Map<string, string>()
-  for (const threat of guestThreats) {
-    threatNameToId.set(threat.name, threat.id)
-  }
 
   // Build control bom-ref -> threat bom-ref mapping from abstract threat mitigations
   const controlRefToThreatRefs = new Map<string, string[]>()
@@ -789,7 +794,7 @@ function reconstructCountermeasures(
     for (const threatRef of threatRefsFromControl) {
       const abstractThreat = abstractThreats.find((t) => t['bom-ref'] === threatRef)
       if (abstractThreat) {
-        const matchedThreatId = threatNameToId.get(abstractThreat.name)
+        const matchedThreatId = threatBomRefToGuestId.get(abstractThreat['bom-ref'])
         if (matchedThreatId) {
           threatId = matchedThreatId
           break
@@ -803,7 +808,7 @@ function reconstructCountermeasures(
       for (const threatRef of threatRefs) {
         const abstractThreat = abstractThreats.find((t) => t['bom-ref'] === threatRef)
         if (abstractThreat) {
-          const matchedThreatId = threatNameToId.get(abstractThreat.name)
+          const matchedThreatId = threatBomRefToGuestId.get(abstractThreat['bom-ref'])
           if (matchedThreatId) {
             threatId = matchedThreatId
             break
@@ -827,7 +832,11 @@ function reconstructCountermeasures(
 
 /**
  * Build a bom-ref -> node/edge ID reverse map for round-trip deserialization.
- * Uses the blueprint's assets/flows/zones to map bom-refs to visualization node/edge IDs.
+ *
+ * Uses positional matching: during serialization, zones/assets/flows are built
+ * by iterating filtered node/edge arrays in order. The visualization preserves
+ * the original arrays. So the Nth blueprint entry corresponds to the Nth
+ * matching visualization node/edge — no name-based lookups needed.
  */
 function buildBomRefToNodeIdMap(
   nodes: DiagramNode[],
@@ -840,47 +849,26 @@ function buildBomRefToNodeIdMap(
   const blueprint = blueprints?.[0]
   if (!blueprint) return map
 
-  // Match assets/zones to nodes by name (since bom-refs are generated)
-  const nodesByName = new Map<string, DiagramNode>()
-  for (const node of nodes) {
-    const key = `${node.type}:${node.data.label}`
-    if (!nodesByName.has(key)) {
-      nodesByName.set(key, node)
-    }
+  // Map zone bom-refs to zone nodes by position
+  const zoneNodes = nodes.filter((n) => n.type === 'trustZone')
+  const zones = blueprint.zones ?? []
+  for (let i = 0; i < zones.length && i < zoneNodes.length; i++) {
+    map.set(zones[i]['bom-ref'], { id: zoneNodes[i].id, type: 'node' })
   }
 
-  // Map zone bom-refs to zone nodes
-  for (const zone of blueprint.zones ?? []) {
-    const node = nodesByName.get(`trustZone:${zone.name}`)
-    if (node) {
-      map.set(zone['bom-ref'], { id: node.id, type: 'node' })
-    }
+  // Map asset bom-refs to asset nodes by position
+  const assetNodeTypes = ['process', 'datastore', 'humanActor', 'systemActor']
+  const assetNodes = nodes.filter((n) => assetNodeTypes.includes(n.type ?? ''))
+  const assets = blueprint.assets ?? []
+  for (let i = 0; i < assets.length && i < assetNodes.length; i++) {
+    map.set(assets[i]['bom-ref'], { id: assetNodes[i].id, type: 'node' })
   }
 
-  // Map asset bom-refs to nodes
-  for (const asset of blueprint.assets ?? []) {
-    const nodeType = ASSET_TYPE_TO_NODE_TYPE[asset.type] ?? 'process'
-    const node = nodesByName.get(`${nodeType}:${asset.name}`)
-    if (node) {
-      map.set(asset['bom-ref'], { id: node.id, type: 'node' })
-    }
-  }
-
-  // Map flow bom-refs to edges
-  const edgesByLabel = new Map<string, DiagramEdge>()
-  for (const edge of edges) {
-    const label = (edge.data as Record<string, unknown>)?.label as string
-    if (label && !edgesByLabel.has(label)) {
-      edgesByLabel.set(label, edge)
-    }
-  }
-  for (const flow of blueprint.flows ?? []) {
-    if (flow.name) {
-      const edge = edgesByLabel.get(flow.name)
-      if (edge) {
-        map.set(flow['bom-ref'], { id: edge.id, type: 'edge' })
-      }
-    }
+  // Map flow bom-refs to dataFlow edges by position
+  const dataFlowEdges = edges.filter((e) => e.type === 'dataFlow')
+  const flows = blueprint.flows ?? []
+  for (let i = 0; i < flows.length && i < dataFlowEdges.length; i++) {
+    map.set(flows[i]['bom-ref'], { id: dataFlowEdges[i].id, type: 'edge' })
   }
 
   return map

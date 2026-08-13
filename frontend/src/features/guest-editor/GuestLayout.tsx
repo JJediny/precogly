@@ -3,6 +3,7 @@ import { Outlet, useNavigate } from 'react-router-dom'
 import type { NodeChange, EdgeChange } from '@xyflow/react'
 import type { DiagramNode, DiagramEdge } from '@/features/dfd-editor/types'
 import type { DFDNotationStyle } from '@/features/dfd-editor/types/notation'
+import type { ExportImageOptions } from '@/features/dfd-editor/lib/export-diagram-image'
 import { useGuestDiagramState } from './hooks/useGuestDiagramState'
 import { useGuestThreats } from './hooks/useGuestThreats'
 import { useGuestCountermeasures } from './hooks/useGuestCountermeasures'
@@ -24,7 +25,7 @@ export interface GuestDiagramOutletContext {
   canUndo: boolean
   notationStyle: DFDNotationStyle
   setNotationStyle: (notation: DFDNotationStyle) => void
-  exportImageRef: React.MutableRefObject<((format: 'png' | 'svg') => void) | null>
+  exportImageRef: React.MutableRefObject<((format: 'png' | 'svg', options?: ExportImageOptions) => void | Promise<void>) | null>
   captureImageRef: React.MutableRefObject<(() => Promise<Uint8Array | null>) | null>
   onCacheImage: (image: Uint8Array | null) => void
 }
@@ -37,7 +38,7 @@ export function GuestLayout() {
   const systemContextOps = useGuestSystemContext()
   const [notationStyle, setNotationStyle] = useState<DFDNotationStyle>('yourdon')
   const fileHandleState = useFileHandle()
-  const exportImageRef = useRef<((format: 'png' | 'svg') => void) | null>(null)
+  const exportImageRef = useRef<((format: 'png' | 'svg', options?: ExportImageOptions) => void | Promise<void>) | null>(null)
   const captureImageRef = useRef<(() => Promise<Uint8Array | null>) | null>(null)
   const [cachedDiagramImage, setCachedDiagramImage] = useState<Uint8Array | null>(null)
 

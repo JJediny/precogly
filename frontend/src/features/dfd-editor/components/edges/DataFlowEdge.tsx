@@ -59,6 +59,7 @@ export const DataFlowEdge = memo(function DataFlowEdge({
       {/* Edge labels - only show when selected or has important data */}
       <EdgeLabelRenderer>
         <div
+          data-id={id}
           className={cn(
             'absolute pointer-events-auto nodrag nopan flex flex-col items-center gap-1',
             'transform -translate-x-1/2 -translate-y-1/2 transition-opacity',

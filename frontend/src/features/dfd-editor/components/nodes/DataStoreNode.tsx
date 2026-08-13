@@ -67,7 +67,7 @@ export const DataStoreNode = memo(function DataStoreNode({
           /* Yourdon/DeMarco: two parallel horizontal lines */
           <div
             className={cn(
-              'w-full h-full relative bg-purple-50 flex items-center border-t-2 border-b-2',
+              'w-full min-h-full relative bg-purple-50 flex items-center border-t-2 border-b-2',
               selected ? 'border-purple-500 shadow-md' : 'border-purple-200',
               isNewlyInserted && 'shadow-[0_-2px_0_0_#4ade80,0_2px_0_0_#4ade80]',
               showLockAnimation && 'animate-lock-pulse shadow-[0_-2px_0_0_#fb923c,0_2px_0_0_#fb923c]'
@@ -80,7 +80,7 @@ export const DataStoreNode = memo(function DataStoreNode({
                   nodeId={id}
                   label={data.label}
                   isEditing={data.isInlineEditing}
-                  className="font-medium text-xs text-purple-900 truncate"
+                  className="font-medium text-xs text-purple-900 line-clamp-6 break-words"
                   inputClassName="text-xs text-purple-900 w-full"
                 />
                 {data.technology && (
@@ -95,7 +95,7 @@ export const DataStoreNode = memo(function DataStoreNode({
           /* DFD3: Cylinder shape using CSS */
           <div
             className={cn(
-              'w-full h-full relative bg-purple-50 border-2 rounded-lg overflow-hidden flex flex-col min-w-[120px]',
+              'w-full min-h-full relative bg-purple-50 border-2 rounded-lg overflow-hidden flex flex-col min-w-[120px]',
               selected ? 'border-purple-500 shadow-md' : 'border-purple-200'
             )}
           >
@@ -111,7 +111,7 @@ export const DataStoreNode = memo(function DataStoreNode({
                     nodeId={id}
                     label={data.label}
                     isEditing={data.isInlineEditing}
-                    className="font-medium text-sm text-purple-900 truncate"
+                    className="font-medium text-sm text-purple-900 line-clamp-6 break-words"
                     inputClassName="text-sm text-purple-900 w-full"
                   />
                   {data.technology && (

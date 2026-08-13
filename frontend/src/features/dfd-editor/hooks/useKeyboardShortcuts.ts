@@ -174,12 +174,14 @@ export function useKeyboardShortcuts({
     if (!enabled) return
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      // Don't handle shortcuts when typing in inputs
+      // Don't handle shortcuts when typing in inputs or while focus is
+      // inside a modal — canvas edits behind an open dialog are invisible
       const target = event.target as HTMLElement
       if (
         target.tagName === 'INPUT' ||
         target.tagName === 'TEXTAREA' ||
-        target.isContentEditable
+        target.isContentEditable ||
+        target.closest?.('[role="dialog"], [role="alertdialog"]')
       ) {
         return
       }

@@ -400,6 +400,7 @@ class InstanceCountermeasureSerializer(serializers.ModelSerializer):
         source="assigned_owner.email", read_only=True
     )
     threat_links = CountermeasureThreatLinkSerializer(many=True, read_only=True)
+    days_overdue = serializers.IntegerField(read_only=True)
 
     # Write fields - accept custom countermeasure data
     countermeasure_name = serializers.CharField(required=False, allow_blank=True, write_only=True)
@@ -425,6 +426,9 @@ class InstanceCountermeasureSerializer(serializers.ModelSerializer):
             "status",
             "priority",
             "due_date",
+            "scheduled_completion",
+            "days_overdue",
+            "poam_id",
             "external_ticket_url",
             "verified_by",
             "verified_by_email",
@@ -451,6 +455,7 @@ class InstanceCountermeasureSerializer(serializers.ModelSerializer):
             "verified_by_email",
             "assigned_owner_email",
             "threat_links",
+            "days_overdue",
         ]
 
     def get_countermeasure_name_display(self, obj):

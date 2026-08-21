@@ -543,7 +543,10 @@ class InstanceCountermeasure(TimestampedModel):
         related_name="verified_countermeasures",
     )
     evidence_url = models.URLField(blank=True)
-    required_for_release = models.BooleanField(default=False)
+    required_for_release = models.BooleanField(
+        default=False,
+        help_text="ATO gate: control blocks release (e.g. FedRAMP showstopper)",
+    )
     assigned_owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -575,6 +578,17 @@ class InstanceCountermeasure(TimestampedModel):
     )
     priority = models.CharField(max_length=10, default="none", blank=True)
     due_date = models.DateField(null=True, blank=True, help_text="Target completion date")
+    scheduled_completion = models.DateField(
+        null=True,
+        blank=True,
+        help_text="POA&M scheduled-completion-date (OSCAL POA&M); distinct from generic due_date",
+    )
+    poam_id = models.CharField(
+        max_length=50,
+        blank=True,
+        db_index=True,
+        help_text="POA&M item identifier (e.g. OSCAL poam-item.uuid or agency POA&M ID)",
+    )
     external_ticket_url = models.URLField(
         blank=True, help_text="Link to Jira/GitHub/etc. ticket"
     )
@@ -590,6 +604,18 @@ class InstanceCountermeasure(TimestampedModel):
 
     def __str__(self):
         return f"CM:{self.countermeasure_name or self.countermeasure_library}"
+
+    @property
+    def days_overdue(self) -> int | None:
+        """Days past scheduled_completion for non-implemented items; None if not overdue."""
+        if not self.scheduled_completion:
+            return None
+        if self.status in (self.Status.IMPLEMENTED, self.Status.VERIFIED):
+            return None
+        from datetime import date
+
+        delta = (date.today() - self.scheduled_completion).days
+        return delta if delta > 0 else None
 
 
 class CountermeasureThreatLink(TimestampedModel):

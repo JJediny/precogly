@@ -9,6 +9,7 @@ import type {
   LibraryPackListItem,
   PackDependencyCheck,
   PackFilters,
+  PackIcon,
   ValidationResult,
 } from '@/features/libraries/types/packs'
 
@@ -33,6 +34,7 @@ export interface SourcePackInfo {
   version: string
   packType: string
   author: string
+  icon?: PackIcon
   tags: string[]
   path: string
   relativePath: string
@@ -132,6 +134,7 @@ export interface PackPreviewResponse {
     version: string
     packType: string
     author: string
+    icon?: PackIcon
     tags: string[]
   }
   components: PackPreviewComponent[]

@@ -1,0 +1,54 @@
+pack:
+  schema_version: 1
+  slug: icons
+  name: Icon Catalog
+  description: |
+    Proof-of-concept catalog of pack/framework icons rendered by the
+    frontend `PackIcon` component. Each entry maps a slug used in
+    `pack.yaml` (`icon:` field) to a brand icon exported by
+    `@thesvg/react`. This pack is informational only — no components,
+    threats, or requirements are imported. It exists so authors can
+    discover available icons without opening the source registry.
+
+    Inspired by GSA-TTS/TTSE-petrified-forest-sspp#95, where the SSPP
+    library keeps a first-class icon catalog alongside its content
+    packs.
+  version: 0.1.0
+  pack_type: taxonomy
+  author: Precogly
+  icon:
+    slug: owasp
+    width: 24
+    height: 24
+    fill: currentColor
+    className: text-muted-foreground
+    ariaLabel: Icon catalog
+  tags:
+    - icons
+    - ui
+    - poc
+    - all
+
+# Informational catalog of icon slugs available to `pack.yaml -> icon:`.
+# Keep in sync with `frontend/src/features/libraries/components/PackIcon.tsx`.
+icons:
+  - slug: aws
+    label: Amazon Web Services
+    source: '@thesvg/react/aws'
+    aliases: [aws-logo]
+  - slug: azure
+    label: Microsoft Azure
+    source: '@thesvg/react/azure'
+    aliases: [azure-logo]
+  - slug: google-cloud
+    label: Google Cloud
+    source: '@thesvg/react/google-cloud'
+    aliases: [gcp, gcp-logo]
+  - slug: owasp
+    label: OWASP Foundation
+    source: '@thesvg/react/owasp'
+    aliases: [owasp-logo]
+  - slug: european-union
+    label: European Union
+    source: '@thesvg/react/european-union'
+    aliases: [eu, eu-logo]

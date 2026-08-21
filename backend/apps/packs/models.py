@@ -46,6 +46,31 @@ class LibraryPack(TimestampedModel):
     # Metadata
     author = models.CharField(max_length=255, help_text="Author or organization name")
 
+    # Presentation: optional icon config rendered by the frontend
+    # icon library (see @thesvg/react). Stored as a JSON object so YAML
+    # can declare defaults for width/height/fill/variant/className/etc.
+    # Shape:
+    #   {
+    #     "slug": "aws",                # required; kebab-case
+    #     "variant": "default",         # optional, per-icon typed union
+    #     "width": 24, "height": 24,    # optional (number | string)
+    #     "fill": "currentColor",       # optional
+    #     "viewBox": "0 0 24 24",       # optional
+    #     "className": "h-5 w-5",       # optional
+    #     "style": { ... },             # optional CSSProperties
+    #     "ariaLabel": "AWS logo"       # optional
+    #   }
+    # An empty dict (or missing) means "no icon".
+    icon = models.JSONField(
+        blank=True,
+        default=dict,
+        help_text=(
+            "Optional icon config for the pack (see @thesvg/react). Must be an "
+            "object with at least a 'slug' key, e.g. {\"slug\": \"aws\", "
+            "\"variant\": \"mono\", \"className\": \"h-5 w-5\"}."
+        ),
+    )
+
     # Targeting
     tags = ArrayField(
         models.CharField(max_length=50),

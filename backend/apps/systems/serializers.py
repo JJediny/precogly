@@ -131,6 +131,7 @@ class ComponentLibrarySerializer(serializers.ModelSerializer):
 
     source_pack_name = serializers.CharField(source="source_pack.name", read_only=True)
     source_pack_slug = serializers.CharField(source="source_pack.slug", read_only=True)
+    source_pack_icon = serializers.JSONField(source="source_pack.icon", read_only=True)
 
     class Meta:
         model = ComponentLibrary
@@ -142,9 +143,11 @@ class ComponentLibrarySerializer(serializers.ModelSerializer):
             "category",
             "component_type",
             "provider",
+            "icon",
             "source_pack",
             "source_pack_name",
             "source_pack_slug",
+            "source_pack_icon",
             "created_at",
             "updated_at",
         ]
@@ -155,6 +158,7 @@ class ComponentLibrarySerializer(serializers.ModelSerializer):
             "updated_at",
             "source_pack_name",
             "source_pack_slug",
+            "source_pack_icon",
         ]
 
 

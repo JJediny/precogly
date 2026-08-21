@@ -5,6 +5,7 @@ pack:
   version: 1.0.0
   pack_type: compliance
   author: Precogly
+  icon: european-union
   description: Digital Operational Resilience Act
   tags:
   - compliance

@@ -2,12 +2,13 @@
  * Card component for displaying a library pack.
  */
 
-import { Check, Eye, Package } from 'lucide-react'
+import { Check, Eye } from 'lucide-react'
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import type { LibraryPackListItem } from '@/features/libraries/types/packs'
 import { packTypeColors } from '../constants'
+import { PackIcon } from './PackIcon'
 
 interface PackCardProps {
   pack: LibraryPackListItem
@@ -23,7 +24,11 @@ export function PackCard({ pack, onImport, onPreview, importing }: PackCardProps
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2">
             <div className="p-2 bg-muted rounded-lg">
-              <Package className="h-5 w-5 text-muted-foreground" />
+              <PackIcon
+                icon={pack.icon}
+                className="h-5 w-5 text-muted-foreground"
+                aria-label={pack.icon ? `${pack.name} icon` : undefined}
+              />
             </div>
             <div className="min-w-0">
               <h3 className="font-semibold text-sm truncate">{pack.name}</h3>

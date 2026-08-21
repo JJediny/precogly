@@ -3,9 +3,10 @@ import { Handle, Position, NodeResizer, type Node, type NodeProps } from '@xyflo
 import { Database } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { InlineEditableLabel } from './InlineEditableLabel'
+import { TechnologyIcon } from './TechnologyIcon'
 import type { DataStoreNodeData } from '../../types'
 import { DATA_SENSITIVITY_CONFIG } from '../../types'
-import { useTechnologyDisplayName } from '../../api/component-library'
+import { useTechnologyDisplayName, useTechnologyEntry } from '../../api/component-library'
 import { useDFDNotation } from '../../context/DFDNotationContext'
 
 type DataStoreNodeType = Node<DataStoreNodeData, 'datastore'>
@@ -17,6 +18,7 @@ export const DataStoreNode = memo(function DataStoreNode({
 }: NodeProps<DataStoreNodeType>) {
   const isNewlyInserted = data.isNewlyInserted
   const technologyDisplayName = useTechnologyDisplayName(data.technology)
+  const technologyEntry = useTechnologyEntry(data.technology)
   const [showLockAnimation, setShowLockAnimation] = useState(false)
   const { notationStyle } = useDFDNotation()
 
@@ -74,7 +76,11 @@ export const DataStoreNode = memo(function DataStoreNode({
             )}
           >
             <div className="px-3 py-1 flex items-center gap-2 w-full">
-              <Database className="h-3.5 w-3.5 text-purple-600 flex-shrink-0" />
+              <TechnologyIcon
+                technology={technologyEntry}
+                fallback={Database}
+                className="h-3.5 w-3.5 text-purple-600 flex-shrink-0"
+              />
               <div className="flex flex-col min-w-0 flex-1">
                 <InlineEditableLabel
                   nodeId={id}

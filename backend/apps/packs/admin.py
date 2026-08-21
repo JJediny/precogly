@@ -27,7 +27,7 @@ class LibraryPackAdmin(admin.ModelAdmin):
             "fields": ("version",)
         }),
         ("Metadata", {
-            "fields": ("author", "tags")
+            "fields": ("author", "icon", "tags")
         }),
         ("Timestamps", {
             "fields": ("created_at", "updated_at"),

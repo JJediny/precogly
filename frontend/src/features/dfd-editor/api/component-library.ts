@@ -4,6 +4,7 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { api, getAccessToken } from '@/lib/api'
+import type { PackIconConfig } from '@/features/libraries/components/pack-icon-types'
 import type { Technology, TechnologyCategory } from '../lib/technology-registry'
 
 // Backend response type (camelCase from djangorestframework-camel-case middleware)
@@ -15,9 +16,11 @@ interface ComponentLibraryItem {
   category: 'process' | 'datastore' | 'external_human_actor' | 'external_system_actor'  // Node type category
   componentType: string  // Technology category (database, compute, etc.)
   provider: string
+  icon: PackIconConfig | Record<string, never> | null
   sourcePack: number | null
   sourcePackName: string | null
   sourcePackSlug: string | null
+  sourcePackIcon: PackIconConfig | Record<string, never> | null
 }
 
 // Map backend provider to frontend vendor
@@ -70,12 +73,25 @@ function mapComponentTypeToCategory(componentType: string): TechnologyCategory {
 
 // Transform backend item to frontend Technology format
 function transformToTechnology(item: ComponentLibraryItem): Technology {
+  const rawPackIcon = item.sourcePackIcon
+  const packIcon =
+    rawPackIcon && typeof rawPackIcon === 'object' && 'slug' in rawPackIcon
+      ? (rawPackIcon as PackIconConfig)
+      : undefined
+  const rawComponentIcon = item.icon
+  const componentIcon =
+    rawComponentIcon && typeof rawComponentIcon === 'object' && 'slug' in rawComponentIcon
+      ? (rawComponentIcon as PackIconConfig)
+      : undefined
   return {
     id: item.slug || item.qualifiedSlug || String(item.id),
     name: item.name,
     category: mapComponentTypeToCategory(item.componentType),
     vendor: mapProviderToVendor(item.provider),
     description: item.sourcePackName ? `From ${item.sourcePackName}` : undefined,
+    componentIcon,
+    packIcon,
+    sourcePackSlug: item.sourcePackSlug ?? undefined,
   }
 }
 
@@ -127,4 +143,21 @@ export function useTechnologyDisplayName(value: string | undefined): string {
     (t) => t.id === value || t.name.toLowerCase() === value.toLowerCase()
   )
   return match?.name ?? value
+}
+
+/**
+ * Resolve a technology value to its full record so callers can access
+ * derived data (icon config, vendor, source pack). Returns null when
+ * the technology can't be found (e.g. guest editor, custom entries).
+ */
+export function useTechnologyEntry(value: string | undefined): Technology | null {
+  const hasAuth = !!getAccessToken()
+  const { technologies } = useTechnologies(undefined, { enabled: hasAuth })
+
+  if (!value) return null
+
+  const match = technologies.find(
+    (t) => t.id === value || t.name.toLowerCase() === value.toLowerCase()
+  )
+  return match ?? null
 }

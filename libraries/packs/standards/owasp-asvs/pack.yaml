@@ -5,6 +5,7 @@ pack:
   version: 1.0.0
   pack_type: compliance
   author: Precogly
+  icon: owasp
   description: |
     A curated subset of 20 requirements from the OWASP Application Security Verification Standard (ASVS) 4.0.3, covering architecture, authentication, access control, input validation, cryptography, logging, data protection, communications, business logic, API security, and configuration.
   tags:

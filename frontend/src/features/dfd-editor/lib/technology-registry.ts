@@ -1,4 +1,5 @@
 import type { DiagramNodeType } from '../types'
+import type { PackIconConfig } from '@/features/libraries/components/PackIcon'
 
 export interface Technology {
   id: string
@@ -7,6 +8,12 @@ export interface Technology {
   description?: string
   icon?: string
   vendor?: 'aws' | 'azure' | 'gcp' | 'generic'
+  /** Icon config declared on the component itself (overrides pack/vendor). */
+  componentIcon?: PackIconConfig
+  /** Icon config inherited from the technology's source pack (see @thesvg/react). */
+  packIcon?: PackIconConfig
+  /** Slug of the source pack, useful for grouping and fallback icon lookup. */
+  sourcePackSlug?: string
 }
 
 export type TechnologyCategory =

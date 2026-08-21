@@ -5,6 +5,7 @@ pack:
   version: 1.0.0
   pack_type: compliance
   author: Precogly
+  icon: owasp
   description: Open Web Application Security Project Top 10 2021
   tags:
   - compliance

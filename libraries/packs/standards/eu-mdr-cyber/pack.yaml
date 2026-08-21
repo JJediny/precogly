@@ -5,6 +5,7 @@ pack:
   version: 1.0.0
   pack_type: compliance
   author: Precogly
+  icon: european-union
   description: Cybersecurity requirements from the EU Medical Device Regulation (Annex I)
   tags:
   - compliance

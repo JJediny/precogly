@@ -10,6 +10,14 @@ pack:
     OpenSearch Serverless, Cognito, WAF, and CloudWatch. Threats mapped to STRIDE,
     CAPEC, CWE, MITRE ATT&CK, and MITRE ATLAS taxonomies.
   author: Precogly
+  # Nested icon config: pack authors can declare per-icon defaults
+  # (width/height/variant/className/etc.). UI props override at render time.
+  icon:
+    slug: aws
+    variant: default
+    fill: currentColor
+    className: text-orange-500
+    ariaLabel: AWS logo
   depends_on:
   - taxonomies/stride-taxonomy
   - taxonomies/capec

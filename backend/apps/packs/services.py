@@ -28,6 +28,33 @@ from apps.threats.models import (
     ThreatLibraryTaxonomyEntry,
 )
 
+
+def _normalize_icon(raw) -> dict:
+    """Coerce a pack.yaml `icon:` value into the JSONField dict shape.
+
+    Accepts either a bare string (legacy shorthand) or a mapping. Unknown
+    keys are dropped; only the documented props are persisted.
+    """
+    if not raw:
+        return {}
+    if isinstance(raw, str):
+        return {"slug": raw}
+    if not isinstance(raw, dict):
+        return {}
+    allowed = {
+        "slug",
+        "variant",
+        "width",
+        "height",
+        "fill",
+        "viewBox",
+        "className",
+        "style",
+        "ariaLabel",
+    }
+    out = {k: v for k, v in raw.items() if k in allowed and v is not None}
+    return out
+
 from .models import LibraryPack, LibraryPackDependency, PendingFrameworkOverlay, PendingRequirementOverlay, PendingTaxonomyOverlay
 
 logger = logging.getLogger(__name__)
@@ -61,6 +88,7 @@ class PackInfo:
     pack_type: str
     schema_version: int = 1
     author: str = ""
+    icon: dict = field(default_factory=dict)
     tags: list = field(default_factory=list)
     # Absolute filesystem path to the pack directory (for callers that
     # need to load files from disk).
@@ -85,6 +113,7 @@ class PackInfo:
             "pack_type": self.pack_type,
             "schema_version": self.schema_version,
             "author": self.author,
+            "icon": self.icon,
             "tags": self.tags,
             "path": self.path,
             "relative_path": self.relative_path,
@@ -201,6 +230,7 @@ def _discover_pack(pack_dir: Path, libraries_path: Path, existing_packs: dict) -
             pack_type=pack_meta.get("pack_type", "technology"),
             schema_version=pack_meta.get("schema_version", 1),
             author=pack_meta.get("author", ""),
+            icon=_normalize_icon(pack_meta.get("icon")),
             tags=pack_meta.get("tags", []),
             path=str(pack_dir),
             relative_path=relative_path,
@@ -498,6 +528,7 @@ def _extract_pack_preview(pack_dir: Path, pack_data: dict) -> dict:
             "version": pack_meta.get("version", ""),
             "pack_type": pack_meta.get("pack_type", ""),
             "author": pack_meta.get("author", ""),
+            "icon": _normalize_icon(pack_meta.get("icon")),
             "tags": pack_meta.get("tags", []),
         },
         "components": components,
@@ -1664,6 +1695,7 @@ def _create_or_update_pack(pack_data: dict) -> LibraryPack:
             "version": pack["version"],
             "pack_type": pack["pack_type"],
             "author": pack.get("author", ""),
+            "icon": _normalize_icon(pack.get("icon")),
             "tags": pack.get("tags", []),
         },
     )
@@ -2005,6 +2037,7 @@ def _load_components(library_pack: LibraryPack, file_path: Path, import_warnings
                 "category": comp.get("category", "process"),
                 "component_type": comp.get("type", comp.get("component_type", "")),
                 "provider": comp.get("provider", ""),
+                "icon": _normalize_icon(comp.get("icon")),
                 "customization_status": "original",
                 "parent": None,
             },

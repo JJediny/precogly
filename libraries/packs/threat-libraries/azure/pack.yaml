@@ -5,6 +5,7 @@ pack:
   description: Microsoft Azure cloud components for threat modeling diagrams
   version: 2.0.0
   author: Precogly Team
+  icon: azure
   pack_type: technology
   tags:
   - azure

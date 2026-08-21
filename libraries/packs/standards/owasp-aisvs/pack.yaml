@@ -5,6 +5,7 @@ pack:
   version: 1.0.0
   pack_type: compliance
   author: Precogly
+  icon: owasp
   description: |
     OWASP Artificial Intelligence Security Verification Standard (AISVS) v1.0 compliance framework.
     191 testable requirements across 12 chapters covering training data integrity, input validation,

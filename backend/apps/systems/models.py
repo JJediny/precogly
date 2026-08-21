@@ -194,6 +194,18 @@ class ComponentLibrary(TimestampedModel):
     component_type = models.CharField(max_length=100)
     provider = models.CharField(max_length=100, blank=True)
 
+    # Optional per-component icon override. Empty dict = fall back to
+    # the source pack's icon (or the frontend vendor default).
+    icon = models.JSONField(
+        blank=True,
+        default=dict,
+        help_text=(
+            "Optional icon config for this component (same shape as "
+            "LibraryPack.icon). If empty, the component inherits the "
+            "pack icon or the vendor default (aws/azure/gcp)."
+        ),
+    )
+
     # Customization tracking (for update vs fork handling)
     customization_status = models.CharField(
         max_length=20,

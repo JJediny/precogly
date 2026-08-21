@@ -1,8 +1,12 @@
 /**
  * Type definitions for Library Packs.
  */
+import type { PackIconConfig } from '@/features/libraries/components/PackIcon'
 
 export type PackType = 'technology' | 'threat' | 'countermeasure' | 'compliance' | 'template' | 'full' | 'taxonomy'
+
+/** Icon config as returned by the API. Empty object means "no icon". */
+export type PackIcon = PackIconConfig | Record<string, never>
 
 export interface PackDependency {
   id: number
@@ -27,6 +31,7 @@ export interface LibraryPack {
   version: string
   packType: PackType
   author: string
+  icon?: PackIcon
   tags: string[]
   isImported: boolean
   dependencies?: PackDependency[]
@@ -43,6 +48,7 @@ export interface LibraryPackListItem {
   version: string
   packType: PackType
   author: string
+  icon?: PackIcon
   tags: string[]
   isImported: boolean
 }

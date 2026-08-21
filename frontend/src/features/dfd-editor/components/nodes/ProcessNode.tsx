@@ -3,9 +3,10 @@ import { Handle, Position, NodeResizer, useStore, type Node, type NodeProps } fr
 import { Cog } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { InlineEditableLabel } from './InlineEditableLabel'
+import { TechnologyIcon } from './TechnologyIcon'
 import type { ProcessNodeData } from '../../types'
 import { DATA_SENSITIVITY_CONFIG } from '../../types'
-import { useTechnologyDisplayName } from '../../api/component-library'
+import { useTechnologyDisplayName, useTechnologyEntry } from '../../api/component-library'
 import { useDFDNotation } from '../../context/DFDNotationContext'
 
 type ProcessNodeType = Node<ProcessNodeData, 'process'>
@@ -42,6 +43,7 @@ export const ProcessNode = memo(function ProcessNode({
 }: NodeProps<ProcessNodeType>) {
   const isNewlyInserted = data.isNewlyInserted
   const technologyDisplayName = useTechnologyDisplayName(data.technology)
+  const technologyEntry = useTechnologyEntry(data.technology)
   const [showLockAnimation, setShowLockAnimation] = useState(false)
   const [showReceiveAnimation, setShowReceiveAnimation] = useState(false)
   const { notationStyle } = useDFDNotation()
@@ -121,7 +123,11 @@ export const ProcessNode = memo(function ProcessNode({
           <>
             {/* Label badge at top-left */}
             <div className="absolute -top-3 left-3 px-2 py-0.5 rounded text-xs font-medium bg-blue-500 text-white flex items-center gap-1">
-              <Cog className="h-3 w-3" />
+              <TechnologyIcon
+                technology={technologyEntry}
+                fallback={Cog}
+                className="h-3 w-3"
+              />
               <InlineEditableLabel
                 nodeId={id}
                 label={data.label}
@@ -150,7 +156,11 @@ export const ProcessNode = memo(function ProcessNode({
           </>
         ) : isYourdon ? (
           <>
-            <Cog className="h-4 w-4 text-blue-600 flex-shrink-0" />
+            <TechnologyIcon
+              technology={technologyEntry}
+              fallback={Cog}
+              className="h-4 w-4 text-blue-600 flex-shrink-0"
+            />
             <InlineEditableLabel
               nodeId={id}
               label={data.label}
@@ -178,7 +188,11 @@ export const ProcessNode = memo(function ProcessNode({
         ) : (
           <div className="flex flex-col min-w-0 overflow-hidden w-full">
             <div className="flex items-center gap-2 min-w-0">
-              <Cog className="h-4 w-4 text-blue-600 flex-shrink-0" />
+              <TechnologyIcon
+                technology={technologyEntry}
+                fallback={Cog}
+                className="h-4 w-4 text-blue-600 flex-shrink-0"
+              />
               <div className="flex flex-col min-w-0">
                 <InlineEditableLabel
                   nodeId={id}

@@ -5,6 +5,7 @@ components:
     category: datastore
     type: Object Storage
     provider: aws
+    icon: aws-s3
     description: |
       Amazon Simple Storage Service (S3) provides scalable object storage for data backup,
       archival, and analytics. Supports versioning, lifecycle policies, and cross-region replication.
@@ -15,6 +16,7 @@ components:
     category: process
     type: Serverless Function
     provider: aws
+    icon: aws-lambda
     description: |
       AWS Lambda lets you run code without provisioning servers. Supports multiple runtimes
       (Python, Node.js, Java, etc.) with automatic scaling and pay-per-execution pricing.
@@ -25,6 +27,7 @@ components:
     category: process
     type: API Management
     provider: aws
+    icon: aws-api-gateway
     description: |
       Amazon API Gateway is a managed service for creating, publishing, and securing REST,
       HTTP, and WebSocket APIs. Supports throttling, caching, and authorization.
@@ -35,6 +38,7 @@ components:
     category: datastore
     type: NoSQL Database
     provider: aws
+    icon: aws-dynamodb
     description: |
       Amazon DynamoDB is a fully managed NoSQL database with single-digit millisecond latency.
       Supports key-value and document data models with automatic scaling.
@@ -45,6 +49,7 @@ components:
     category: process
     type: Message Queue
     provider: aws
+    icon: aws-sqs
     description: |
       Amazon Simple Queue Service (SQS) is a fully managed message queuing service
       for decoupling and scaling microservices, distributed systems, and serverless apps.
@@ -55,6 +60,7 @@ components:
     category: external_system_actor
     type: AI Model Service
     provider: aws
+    icon: aws-bedrock
     description: |
       Amazon Bedrock is a fully managed service for building generative AI applications
       with foundation models from Anthropic, Meta, Mistral, and others. Supports text
@@ -67,6 +73,7 @@ components:
     category: datastore
     type: Vector Database
     provider: aws
+    icon: aws-opensearch
     description: |
       Amazon OpenSearch Serverless provides serverless search and vector database
       capabilities. Used as a knowledge base for RAG (Retrieval-Augmented Generation)
@@ -78,6 +85,7 @@ components:
     category: external_system_actor
     type: Identity Provider
     provider: aws
+    icon: aws-cognito
     description: |
       Amazon Cognito provides authentication, authorization, and user management for
       web and mobile apps. Supports user pools, identity pools, OAuth 2.0/OIDC,
@@ -89,6 +97,7 @@ components:
     category: process
     type: Web Application Firewall
     provider: aws
+    icon: aws-waf
     description: |
       AWS WAF is a web application firewall that protects against common web exploits
       and bots. Supports managed rules, custom rules, rate limiting, and IP reputation
@@ -100,6 +109,7 @@ components:
     category: external_system_actor
     type: Monitoring Service
     provider: aws
+    icon: aws-cloudwatch
     description: |
       Amazon CloudWatch provides monitoring and observability for AWS resources and
       applications. Collects metrics, logs, and traces. Supports alarms, dashboards,

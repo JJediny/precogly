@@ -3,7 +3,9 @@ import { Handle, Position, type Node, type NodeProps } from '@xyflow/react'
 import { Server } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { InlineEditableLabel } from './InlineEditableLabel'
+import { TechnologyIcon } from './TechnologyIcon'
 import type { SystemActorNodeData } from '../../types'
+import { useTechnologyEntry } from '../../api/component-library'
 
 type SystemActorNodeType = Node<SystemActorNodeData, 'systemActor'>
 
@@ -14,6 +16,9 @@ export const SystemActorNode = memo(function SystemActorNode({
 }: NodeProps<SystemActorNodeType>) {
   const isNewlyInserted = data.isNewlyInserted
   const [showLockAnimation, setShowLockAnimation] = useState(false)
+  // systemType often stores a technology slug (e.g. "aws-cognito"); reuse
+  // the library resolver so the vendor/pack icon can render here too.
+  const technologyEntry = useTechnologyEntry(data.systemType)
 
   // Trigger lock animation when lockAnimationKey changes (new timestamp = new animation)
   useEffect(() => {
@@ -50,7 +55,11 @@ export const SystemActorNode = memo(function SystemActorNode({
         )}
       >
         {/* Server icon */}
-        <Server className="w-8 h-8 text-slate-600 mb-2" />
+        <TechnologyIcon
+          technology={technologyEntry}
+          fallback={Server}
+          className="w-8 h-8 text-slate-600 mb-2"
+        />
 
         {/* Label */}
         <InlineEditableLabel

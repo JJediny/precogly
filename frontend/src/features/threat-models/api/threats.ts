@@ -656,6 +656,7 @@ export interface BackendCountermeasure {
   id: number
   countermeasureLibraryId: number
   countermeasureName: string | null
+  countermeasureDescription: string | null
   controlType: string | null
   status: BackendCountermeasureStatus
   priority: string
@@ -704,6 +705,7 @@ export function transformBackendThreatsToComponentThreats(
       createdAt: now,
       updatedAt: now,
       countermeasureName: cm.countermeasureName || undefined,
+      countermeasureDescription: cm.countermeasureDescription || undefined,
       controlType: cm.controlType || undefined,
       standardMappings: cm.standardMappings || [],
       displayOrder: cm.displayOrder ?? 0,

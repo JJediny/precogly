@@ -548,6 +548,7 @@ class ThreatModelViewSet(viewsets.ModelViewSet):
                 "countermeasure_library_id": cm.countermeasure_library_id,
                 "countermeasure_name": (cm.countermeasure_library.name if cm.countermeasure_library else None) or cm.countermeasure_name,
                 "control_type": (cm.countermeasure_library.control_type if cm.countermeasure_library else None) or cm.control_type,
+                "countermeasure_description": (cm.countermeasure_library.description if cm.countermeasure_library else None) or cm.countermeasure_description,
                 "status": cm.status,
                 "priority": cm.priority,
                 "due_date": cm.due_date,

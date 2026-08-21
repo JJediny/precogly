@@ -1,5 +1,5 @@
 import type { DiagramNodeType } from '../types'
-import type { PackIconConfig } from '@/features/libraries/components/PackIcon'
+import type { PackIconConfig } from '@/features/libraries/components/pack-icon-types'
 
 export interface Technology {
   id: string

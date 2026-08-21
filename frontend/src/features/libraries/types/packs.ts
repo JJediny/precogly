@@ -1,7 +1,7 @@
 /**
  * Type definitions for Library Packs.
  */
-import type { PackIconConfig } from '@/features/libraries/components/PackIcon'
+import type { PackIconConfig } from '@/features/libraries/components/pack-icon-types'
 
 export type PackType = 'technology' | 'threat' | 'countermeasure' | 'compliance' | 'template' | 'full' | 'taxonomy'
 

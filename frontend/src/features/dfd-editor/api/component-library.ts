@@ -4,7 +4,7 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { api, getAccessToken } from '@/lib/api'
-import type { PackIconConfig } from '@/features/libraries/components/PackIcon'
+import type { PackIconConfig } from '@/features/libraries/components/pack-icon-types'
 import type { Technology, TechnologyCategory } from '../lib/technology-registry'
 
 // Backend response type (camelCase from djangorestframework-camel-case middleware)

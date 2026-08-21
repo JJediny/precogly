@@ -2,8 +2,8 @@
 
 Precogly can export threat models as structured JSON and import them back, enabling cross-instance transfer, version-controlled threat models, and interoperability with other tools. For background on the format and version control workflows, see [Threat Model as Code](../concepts/threat-model-as-code.md).
 
-!!! info "Format"
-    Precogly currently uses the [OWASP Threat Model Library](https://github.com/OWASP/www-project-threat-model-library) JSON format (TM-Library v1.0). This is a structured schema designed for threat model interchange and is expected to evolve into the OWASP TM-BOM specification (anticipated August 2026).
+!!! info "Supported formats"
+    Precogly supports two interchange formats: the [OWASP Threat Model Library](https://github.com/OWASP/www-project-threat-model-library) JSON format (TM-Library v1.0) and the [CycloneDX 2.0 Threat Modeling BOM](https://cyclonedx.org/) (TM-BOM). TM-Library is Precogly's native format with full round-trip fidelity. CycloneDX provides industry-standard BOM interchange for use with the broader CycloneDX ecosystem.
 
 ---
 
@@ -156,6 +156,63 @@ If the imported file contains `precogly.org/*` extensions (e.g., from a previous
 
 ---
 
+## CycloneDX 2.0 TM-BOM
+
+Precogly also supports import and export using the CycloneDX 2.0 Threat Modeling BOM format. This enables interchange with tools in the CycloneDX ecosystem such as OWASP Dependency-Track.
+
+### Exporting as CycloneDX
+
+1. Open the threat model you want to export.
+2. Click the **Export** dropdown in the toolbar.
+3. Select **CycloneDX (JSON)**.
+
+The browser downloads a file named `{threat-model-name}-cyclonedx-tm-bom.json`.
+
+![CycloneDX export option in the export dropdown](../assets/images/importing-exporting-cyclonedx-export.png)
+
+The export maps Precogly entities to CycloneDX 2.0 structures:
+
+| Precogly entity | CycloneDX 2.0 structure |
+|-----------------|-------------------------|
+| Threat model scope | `metadata` + `blueprints[0]` |
+| Trust zones | Blueprint `zones` |
+| Components (processes, data stores, actors) | Blueprint `assets` with category mapping |
+| Data flows | Blueprint `dataFlows` |
+| Threats | Top-level `threats` array |
+| Countermeasures | Top-level `controls` array |
+| Risks | Top-level `risks` array |
+| Compliance mappings | `definitions.requirements` |
+
+Entities are cross-linked using BOM references. If the threat model was originally imported from CycloneDX, any Tier 3 passthrough data stored in `format_metadata.cyclonedx` is re-emitted in the export.
+
+### Importing CycloneDX
+
+1. From the **Threat Models** list page, click **Import**.
+2. Drag a CycloneDX JSON file onto the dropzone, or click to open the file picker.
+3. Precogly validates the file and creates a new threat model.
+
+![Import dialog accepting CycloneDX files](../assets/images/importing-exporting-cyclonedx-import.png)
+
+After a successful import, a summary shows counts for each entity type created (threat model, org systems, zones, components, flows, controls, threats, scenarios, risks).
+
+Precogly validates that the file contains `specFormat: "CycloneDX"` and a `specVersion` starting with `2.`. Files that do not meet these requirements are rejected.
+
+!!! warning
+    The import always creates a **new** threat model. It does not merge into or overwrite an existing one.
+
+!!! note
+    If the CycloneDX file contains multiple blueprints, only the first blueprint is imported. A warning is logged for any additional blueprints.
+
+CycloneDX statuses, component categories, severity levels, and risk responses are mapped to Precogly equivalents during import. Review imported control statuses to confirm they match your expectations, as some CycloneDX status values may not have an exact Precogly counterpart.
+
+### When to use CycloneDX vs TM-Library
+
+- **CycloneDX** is an industry standard for BOM interchange. Use it when sharing threat models with tools in the CycloneDX ecosystem or when your organisation standardises on CycloneDX for software supply chain data.
+- **TM-Library** is Precogly's native format with full round-trip fidelity, including extensions for STRIDE tags, compliance mappings, and pack lineage. Use it for backups, version control, and transfers between Precogly instances.
+- Both formats create a complete threat model on import.
+
+---
+
 ## Interoperability with other tools
 
 The exported JSON validates against the TM-Library schema and can be consumed by any tool that supports it. The core threat model data lives in standard schema fields:
@@ -199,3 +256,4 @@ Import any of these to explore a fully populated threat model.
 - [Library Packs](../concepts/library-packs.md) — importing packs to enrich threat models with pre-mapped threats and compliance
 - [Creating a Threat Model](creating-threat-model.md) — step-by-step guide to building from scratch or with library packs
 - [Compliance Mapping](compliance-mapping.md) — mapping countermeasures to framework requirements
+- [CycloneDX specification](https://cyclonedx.org/) — learn more about the CycloneDX BOM standard and ecosystem

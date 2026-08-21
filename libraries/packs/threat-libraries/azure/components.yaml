@@ -6,6 +6,7 @@ components:
     category: datastore
     component_type: database
     provider: azure
+    icon: azure-sql-database
     description: "Managed SQL Server database service"
 
   - slug: cosmosdb
@@ -13,6 +14,7 @@ components:
     category: datastore
     component_type: database
     provider: azure
+    icon: azure-azure-cosmos-db
     description: "Globally distributed multi-model database"
 
   - slug: postgresql
@@ -20,6 +22,7 @@ components:
     category: datastore
     component_type: database
     provider: azure
+    icon: azure-azure-database-postgresql-server
     description: "Managed PostgreSQL database service"
 
   - slug: mysql
@@ -27,6 +30,7 @@ components:
     category: datastore
     component_type: database
     provider: azure
+    icon: azure-azure-database-mysql-server
     description: "Managed MySQL database service"
 
   - slug: synapse
@@ -34,6 +38,7 @@ components:
     category: datastore
     component_type: database
     provider: azure
+    icon: azure-azure-synapse-analytics
     description: "Analytics and data warehouse service"
 
   # STORAGE
@@ -42,6 +47,7 @@ components:
     category: datastore
     component_type: storage
     provider: azure
+    icon: azure-blob
     description: "Object storage for unstructured data"
 
   - slug: files
@@ -49,6 +55,7 @@ components:
     category: datastore
     component_type: storage
     provider: azure
+    icon: azure-files
     description: "Managed file shares (SMB/NFS)"
 
   - slug: data-lake
@@ -56,6 +63,7 @@ components:
     category: datastore
     component_type: storage
     provider: azure
+    icon: azure-data-lake-storage-gen1
     description: "Big data analytics storage"
 
   - slug: queue-storage
@@ -63,6 +71,7 @@ components:
     category: datastore
     component_type: storage
     provider: azure
+    icon: azure-storage-queue
     description: "Message queue storage service"
 
   # CACHE
@@ -71,6 +80,7 @@ components:
     category: datastore
     component_type: cache
     provider: azure
+    icon: azure-cache-redis
     description: "Managed Redis in-memory cache"
 
   # COMPUTE
@@ -79,6 +89,7 @@ components:
     category: process
     component_type: compute
     provider: azure
+    icon: azure-function-apps
     description: "Serverless function execution"
 
   - slug: aks
@@ -86,6 +97,7 @@ components:
     category: process
     component_type: compute
     provider: azure
+    icon: azure-kubernetes-services
     description: "Azure Kubernetes Service - managed Kubernetes"
 
   - slug: app-service
@@ -93,6 +105,7 @@ components:
     category: process
     component_type: compute
     provider: azure
+    icon: azure-app-services
     description: "PaaS for web apps and APIs"
 
   - slug: container-apps
@@ -100,6 +113,7 @@ components:
     category: process
     component_type: compute
     provider: azure
+    icon: azure-container-apps-environments
     description: "Serverless container platform"
 
   - slug: container-instances
@@ -107,6 +121,7 @@ components:
     category: process
     component_type: compute
     provider: azure
+    icon: azure-container-instances
     description: "Run containers without managing servers"
 
   - slug: virtual-machines
@@ -114,6 +129,7 @@ components:
     category: process
     component_type: compute
     provider: azure
+    icon: azure-virtual-machine
     description: "IaaS virtual servers"
 
   - slug: batch
@@ -121,6 +137,7 @@ components:
     category: process
     component_type: compute
     provider: azure
+    icon: azure-batch-accounts
     description: "Large-scale parallel batch processing"
 
   # MESSAGING
@@ -129,6 +146,7 @@ components:
     category: process
     component_type: messaging
     provider: azure
+    icon: azure-azure-service-bus
     description: "Enterprise message broker"
 
   - slug: event-hubs
@@ -136,6 +154,7 @@ components:
     category: process
     component_type: messaging
     provider: azure
+    icon: azure-event-hubs
     description: "Big data streaming platform"
 
   - slug: event-grid
@@ -143,6 +162,7 @@ components:
     category: process
     component_type: messaging
     provider: azure
+    icon: azure-event-grid-domains
     description: "Event routing service"
 
   # NETWORKING
@@ -151,6 +171,7 @@ components:
     category: process
     component_type: networking
     provider: azure
+    icon: azure-virtual-networks
     description: "Isolated virtual network"
 
   - slug: subnet
@@ -158,6 +179,7 @@ components:
     category: process
     component_type: networking
     provider: azure
+    icon: azure-subnet
     description: "Network subnet within VNet"
 
   - slug: private-endpoint
@@ -165,6 +187,7 @@ components:
     category: process
     component_type: networking
     provider: azure
+    icon: azure-private-endpoints
     description: "Private connectivity to Azure services"
 
   - slug: virtual-wan
@@ -172,6 +195,7 @@ components:
     category: process
     component_type: networking
     provider: azure
+    icon: azure-virtual-wans
     description: "Network transit hub"
 
   - slug: application-gateway
@@ -179,6 +203,7 @@ components:
     category: process
     component_type: networking
     provider: azure
+    icon: azure-application-gateways
     description: "Layer 7 load balancer with WAF"
 
   - slug: front-door
@@ -186,6 +211,7 @@ components:
     category: process
     component_type: networking
     provider: azure
+    icon: azure-front-door-and-cdn-profiles
     description: "Global load balancer and CDN"
 
   - slug: load-balancer
@@ -193,6 +219,7 @@ components:
     category: process
     component_type: networking
     provider: azure
+    icon: azure-load-balancers
     description: "Layer 4 load balancer"
 
   - slug: traffic-manager
@@ -200,6 +227,7 @@ components:
     category: process
     component_type: networking
     provider: azure
+    icon: azure-traffic-manager-profiles
     description: "DNS-based traffic routing"
 
   - slug: dns
@@ -207,6 +235,7 @@ components:
     category: process
     component_type: networking
     provider: azure
+    icon: azure-dns-zones
     description: "DNS hosting service"
 
   # SECURITY
@@ -215,6 +244,7 @@ components:
     category: process
     component_type: security
     provider: azure
+    icon: azure-web-application-firewall-policies-waf
     description: "Web Application Firewall"
 
   - slug: ddos-protection
@@ -222,6 +252,7 @@ components:
     category: process
     component_type: security
     provider: azure
+    icon: azure-ddos-protection-plans
     description: "DDoS attack mitigation"
 
   - slug: firewall
@@ -229,6 +260,7 @@ components:
     category: process
     component_type: security
     provider: azure
+    icon: azure-firewalls
     description: "Cloud-native network firewall"
 
   - slug: defender
@@ -236,6 +268,7 @@ components:
     category: process
     component_type: security
     provider: azure
+    icon: azure-microsoft-defender-for-cloud
     description: "Cloud security posture management"
 
   - slug: sentinel
@@ -243,6 +276,7 @@ components:
     category: process
     component_type: security
     provider: azure
+    icon: azure-azure-sentinel
     description: "Cloud-native SIEM and SOAR"
 
   - slug: key-vault
@@ -250,6 +284,7 @@ components:
     category: process
     component_type: security
     provider: azure
+    icon: azure-key-vaults
     description: "Secrets, keys, and certificate management"
 
   - slug: dedicated-hsm
@@ -257,6 +292,7 @@ components:
     category: process
     component_type: security
     provider: azure
+    icon: azure-dedicated-hsm
     description: "Hardware Security Module"
 
   - slug: bastion
@@ -264,6 +300,7 @@ components:
     category: process
     component_type: security
     provider: azure
+    icon: azure-bastions
     description: "Secure RDP/SSH access to VMs"
 
   - slug: vpn-gateway
@@ -271,6 +308,7 @@ components:
     category: process
     component_type: security
     provider: azure
+    icon: azure-virtual-network-gateways
     description: "Site-to-site and point-to-site VPN"
 
   # AUTH / IDENTITY
@@ -279,6 +317,7 @@ components:
     category: process
     component_type: auth
     provider: azure
+    icon: azure-entra-connect
     description: "Cloud identity and access management (formerly Azure AD)"
 
   - slug: ad-b2c
@@ -286,6 +325,7 @@ components:
     category: process
     component_type: auth
     provider: azure
+    icon: azure-azure-ad-b2c
     description: "Customer identity management"
 
   - slug: managed-identity
@@ -293,6 +333,7 @@ components:
     category: process
     component_type: auth
     provider: azure
+    icon: azure-managed-identities
     description: "Automatic credential management for Azure resources"
 
   # MONITORING
@@ -301,6 +342,7 @@ components:
     category: process
     component_type: monitoring
     provider: azure
+    icon: azure-monitor
     description: "Full-stack monitoring service"
 
   - slug: app-insights
@@ -308,6 +350,7 @@ components:
     category: process
     component_type: monitoring
     provider: azure
+    icon: azure-application-insights
     description: "Application performance monitoring"
 
   - slug: log-analytics
@@ -315,6 +358,7 @@ components:
     category: process
     component_type: monitoring
     provider: azure
+    icon: azure-log-analytics-workspaces
     description: "Log collection and analysis"
 
   # API MANAGEMENT
@@ -323,4 +367,5 @@ components:
     category: process
     component_type: networking
     provider: azure
+    icon: azure-api-management-services
     description: "API gateway and developer portal"

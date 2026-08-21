@@ -6,6 +6,7 @@ components:
     category: datastore
     component_type: database
     provider: gcp
+    icon: gcp-cloud-sql
     description: "Managed PostgreSQL database service"
 
   - slug: cloudsql-mysql
@@ -13,6 +14,7 @@ components:
     category: datastore
     component_type: database
     provider: gcp
+    icon: gcp-cloud-sql
     description: "Managed MySQL database service"
 
   - slug: firestore
@@ -20,6 +22,7 @@ components:
     category: datastore
     component_type: database
     provider: gcp
+    icon: gcp-firestore
     description: "Serverless NoSQL document database"
 
   - slug: bigtable
@@ -27,6 +30,7 @@ components:
     category: datastore
     component_type: database
     provider: gcp
+    icon: gcp-bigtable
     description: "Wide-column NoSQL database"
 
   - slug: bigquery
@@ -34,6 +38,7 @@ components:
     category: datastore
     component_type: database
     provider: gcp
+    icon: gcp-bigquery
     description: "Serverless data warehouse"
 
   - slug: spanner
@@ -41,6 +46,7 @@ components:
     category: datastore
     component_type: database
     provider: gcp
+    icon: gcp-cloud-spanner
     description: "Globally distributed relational database"
 
   - slug: datastore
@@ -48,6 +54,7 @@ components:
     category: datastore
     component_type: database
     provider: gcp
+    icon: gcp-datastore
     description: "NoSQL document database (legacy mode)"
 
   # STORAGE
@@ -56,6 +63,7 @@ components:
     category: datastore
     component_type: storage
     provider: gcp
+    icon: gcp-cloud-storage
     description: "Object storage service"
 
   - slug: filestore
@@ -63,6 +71,7 @@ components:
     category: datastore
     component_type: storage
     provider: gcp
+    icon: gcp-filestore
     description: "Managed NFS file storage"
 
   - slug: persistent-disk
@@ -70,6 +79,7 @@ components:
     category: datastore
     component_type: storage
     provider: gcp
+    icon: gcp-persistent-disk
     description: "Block storage for VMs"
 
   # CACHE
@@ -78,6 +88,7 @@ components:
     category: datastore
     component_type: cache
     provider: gcp
+    icon: gcp-memorystore
     description: "Managed Redis in-memory cache"
 
   - slug: memorystore-memcached
@@ -85,6 +96,7 @@ components:
     category: datastore
     component_type: cache
     provider: gcp
+    icon: gcp-memorystore
     description: "Managed Memcached in-memory cache"
 
   # COMPUTE
@@ -93,6 +105,7 @@ components:
     category: process
     component_type: compute
     provider: gcp
+    icon: gcp-cloud-functions
     description: "Serverless function execution"
 
   - slug: cloud-run
@@ -100,6 +113,7 @@ components:
     category: process
     component_type: compute
     provider: gcp
+    icon: gcp-cloud-run-for-anthos
     description: "Serverless container platform"
 
   - slug: gke
@@ -107,6 +121,7 @@ components:
     category: process
     component_type: compute
     provider: gcp
+    icon: gcp-google-kubernetes-engine
     description: "Google Kubernetes Engine - managed Kubernetes"
 
   - slug: compute-engine
@@ -114,6 +129,7 @@ components:
     category: process
     component_type: compute
     provider: gcp
+    icon: gcp-compute-engine
     description: "Virtual machine instances"
 
   - slug: app-engine
@@ -121,6 +137,7 @@ components:
     category: process
     component_type: compute
     provider: gcp
+    icon: gcp-app-engine
     description: "PaaS for web applications"
 
   - slug: cloud-build
@@ -128,6 +145,7 @@ components:
     category: process
     component_type: compute
     provider: gcp
+    icon: gcp-cloud-build
     description: "CI/CD build service"
 
   # MESSAGING
@@ -136,6 +154,7 @@ components:
     category: process
     component_type: messaging
     provider: gcp
+    icon: gcp-pubsub
     description: "Messaging and event ingestion"
 
   - slug: cloud-tasks
@@ -143,6 +162,7 @@ components:
     category: process
     component_type: messaging
     provider: gcp
+    icon: gcp-cloud-tasks
     description: "Asynchronous task execution"
 
   - slug: dataflow
@@ -150,6 +170,7 @@ components:
     category: process
     component_type: messaging
     provider: gcp
+    icon: gcp-dataflow
     description: "Stream and batch data processing"
 
   # NETWORKING
@@ -158,6 +179,7 @@ components:
     category: process
     component_type: networking
     provider: gcp
+    icon: gcp-virtual-private-cloud
     description: "Virtual Private Cloud network"
 
   - slug: subnet
@@ -165,6 +187,7 @@ components:
     category: process
     component_type: networking
     provider: gcp
+    icon: gcp-virtual-private-cloud
     description: "Regional subnet within VPC"
 
   - slug: private-service-connect
@@ -172,6 +195,7 @@ components:
     category: process
     component_type: networking
     provider: gcp
+    icon: gcp-private-service-connect
     description: "Private connectivity to Google services"
 
   - slug: network-connectivity
@@ -179,6 +203,7 @@ components:
     category: process
     component_type: networking
     provider: gcp
+    icon: gcp-network-connectivity-center
     description: "Network hub for hybrid connectivity"
 
   - slug: cloud-load-balancing
@@ -186,6 +211,7 @@ components:
     category: process
     component_type: networking
     provider: gcp
+    icon: gcp-cloud-load-balancing
     description: "Global and regional load balancing"
 
   - slug: cloud-cdn
@@ -193,6 +219,7 @@ components:
     category: process
     component_type: networking
     provider: gcp
+    icon: gcp-cloud-cdn
     description: "Content Delivery Network"
 
   - slug: cloud-dns
@@ -200,6 +227,7 @@ components:
     category: process
     component_type: networking
     provider: gcp
+    icon: gcp-cloud-dns
     description: "Managed DNS service"
 
   - slug: cloud-nat
@@ -207,6 +235,7 @@ components:
     category: process
     component_type: networking
     provider: gcp
+    icon: gcp-cloud-nat
     description: "Network Address Translation"
 
   # SECURITY
@@ -215,6 +244,7 @@ components:
     category: process
     component_type: security
     provider: gcp
+    icon: gcp-cloud-armor
     description: "DDoS protection and WAF"
 
   - slug: cloud-firewall
@@ -222,6 +252,7 @@ components:
     category: process
     component_type: security
     provider: gcp
+    icon: gcp-cloud-firewall-rules
     description: "Network firewall rules"
 
   - slug: security-command-center
@@ -229,6 +260,7 @@ components:
     category: process
     component_type: security
     provider: gcp
+    icon: gcp-security-command-center
     description: "Security and risk management"
 
   - slug: cloud-kms
@@ -236,6 +268,7 @@ components:
     category: process
     component_type: security
     provider: gcp
+    icon: gcp-key-management-service
     description: "Key Management Service"
 
   - slug: secret-manager
@@ -243,6 +276,7 @@ components:
     category: process
     component_type: security
     provider: gcp
+    icon: gcp-secret-manager
     description: "Secrets storage and management"
 
   - slug: cloud-hsm
@@ -250,6 +284,7 @@ components:
     category: process
     component_type: security
     provider: gcp
+    icon: gcp-cloud-hsm
     description: "Hardware Security Module"
 
   - slug: cloud-vpn
@@ -257,6 +292,7 @@ components:
     category: process
     component_type: security
     provider: gcp
+    icon: gcp-cloud-vpn
     description: "Site-to-site VPN connectivity"
 
   - slug: iap
@@ -264,6 +300,7 @@ components:
     category: process
     component_type: security
     provider: gcp
+    icon: gcp-identity-aware-proxy
     description: "Zero-trust access to applications"
 
   # AUTH / IDENTITY
@@ -272,6 +309,7 @@ components:
     category: process
     component_type: auth
     provider: gcp
+    icon: gcp-identity-platform
     description: "Customer identity management"
 
   - slug: iam
@@ -279,6 +317,7 @@ components:
     category: process
     component_type: auth
     provider: gcp
+    icon: gcp-identity-and-access-management
     description: "Identity and Access Management"
 
   - slug: workload-identity
@@ -286,6 +325,7 @@ components:
     category: process
     component_type: auth
     provider: gcp
+    icon: gcp-workload-identity-pool
     description: "Kubernetes workload identity federation"
 
   # MONITORING
@@ -294,6 +334,7 @@ components:
     category: process
     component_type: monitoring
     provider: gcp
+    icon: gcp-cloud-monitoring
     description: "Infrastructure and application monitoring"
 
   - slug: cloud-logging
@@ -301,6 +342,7 @@ components:
     category: process
     component_type: monitoring
     provider: gcp
+    icon: gcp-cloud-logging
     description: "Log management and analysis"
 
   - slug: cloud-trace
@@ -323,6 +365,7 @@ components:
     category: process
     component_type: networking
     provider: gcp
+    icon: gcp-api
     description: "Serverless API gateway"
 
   - slug: apigee
@@ -330,4 +373,5 @@ components:
     category: process
     component_type: networking
     provider: gcp
+    icon: gcp-apigee-api-platform
     description: "Full-featured API management platform"

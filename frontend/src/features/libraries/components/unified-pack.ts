@@ -1,3 +1,5 @@
+import type { PackIcon } from '@/features/libraries/types/packs'
+
 // Unified pack type that can represent both source and database packs
 export interface UnifiedPack {
   slug: string
@@ -5,6 +7,7 @@ export interface UnifiedPack {
   description: string
   version: string
   packType: string
+  icon?: PackIcon
   tags: string[]
   relativePath: string
   componentCount: number

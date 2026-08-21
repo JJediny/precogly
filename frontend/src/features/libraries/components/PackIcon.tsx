@@ -1,13 +1,18 @@
 /**
  * PackIcon renders a brand/logo icon from `@thesvg/react` by slug.
  *
- * Pass-through dynamic import (`@thesvg/react/<slug>`) — no middleware
- * registry. The `icon` field in `pack.yaml` / `component.icon` is either
- * a bare slug string or a config object. Runtime props override YAML.
+ * Pass-through resolution — no middleware registry. The `icon` field in
+ * `pack.yaml` / `component.icon` is either a bare slug string or a
+ * config object. Runtime props override YAML.
  *
  * Look up slugs at https://thesvg.org (kebab-case, e.g. `aws-aws-lambda`).
- * Slugs are shape-validated before the import; unknown slugs render the
- * fallback and warn once in dev.
+ * Slugs are shape-validated before the lookup; unknown or malformed slugs
+ * render the fallback and warn once in dev.
+ *
+ * Implementation note: we use `import.meta.glob('/node_modules/@thesvg/react/dist/*.js')`
+ * to have Vite pre-index every icon module as a lazy loader. This works
+ * for both dev and production because Vite statically analyzes the glob,
+ * unlike a bare-specifier dynamic import which fails at runtime in dev.
  */
 import { forwardRef, Suspense, use, useMemo, createElement } from 'react'
 import type { ComponentType, Ref, SVGProps } from 'react'
@@ -21,24 +26,47 @@ import {
 
 type SvgComponent = ComponentType<SVGProps<SVGSVGElement> & { variant?: string }>
 
+// Vite discovers every icon module at build time. `import: 'default'`
+// unwraps the default export so the loader resolves to the component
+// directly, without a `.then(m => m.default)` step at call time.
+const iconLoaders = import.meta.glob<SvgComponent>(
+  '/node_modules/@thesvg/react/dist/*.js',
+  { import: 'default' },
+)
+
 const iconCache = new Map<string, Promise<SvgComponent>>()
 const warned = new Set<string>()
+
+/** Sync: does `@thesvg/react` ship a module for this slug?
+ *  Lets callers (e.g. TechnologyIcon) skip an override and try the
+ *  next resolver instead of committing to a slug that will fall back. */
+export function isKnownPackIconSlug(slug: string | null | undefined): boolean {
+  if (!slug) return false
+  const normalized = slug.trim().toLowerCase()
+  if (!isValidPackIconSlug(normalized)) return false
+  return `/node_modules/@thesvg/react/dist/${normalized}.js` in iconLoaders
+}
 
 function iconPromise(slug: string): Promise<SvgComponent> {
   const cached = iconCache.get(slug)
   if (cached) return cached
-  const p = import(/* @vite-ignore */ `@thesvg/react/${slug}`)
-    .then((mod) => {
-      const first = mod.default ?? (mod as Record<string, unknown>)[Object.keys(mod)[0]]
-      return first as SvgComponent
-    })
-    .catch((err) => {
-      if (import.meta.env.DEV && !warned.has(slug)) {
-        warned.add(slug)
-        console.warn(`[PackIcon] Unknown @thesvg/react slug: "${slug}"`, err)
-      }
-      return Package as unknown as SvgComponent
-    })
+  const loader = iconLoaders[`/node_modules/@thesvg/react/dist/${slug}.js`]
+  if (!loader) {
+    if (import.meta.env.DEV && !warned.has(slug)) {
+      warned.add(slug)
+      console.warn(`[PackIcon] Unknown @thesvg/react slug: "${slug}"`)
+    }
+    const p = Promise.resolve(Package as unknown as SvgComponent)
+    iconCache.set(slug, p)
+    return p
+  }
+  const p = loader().catch((err: unknown) => {
+    if (import.meta.env.DEV && !warned.has(slug)) {
+      warned.add(slug)
+      console.warn(`[PackIcon] Failed to load @thesvg/react slug: "${slug}"`, err)
+    }
+    return Package as unknown as SvgComponent
+  })
   iconCache.set(slug, p)
   return p
 }

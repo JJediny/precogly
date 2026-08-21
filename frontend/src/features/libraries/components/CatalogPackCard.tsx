@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { PackIcon } from './PackIcon'
 import type { UnifiedPack } from './unified-pack'
 import { packTypeColors } from '../constants'
 
@@ -37,7 +38,12 @@ export function CatalogPackCard({
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-muted rounded-lg">
-            <Package className="h-5 w-5 text-muted-foreground" />
+            <PackIcon
+              icon={pack.icon}
+              fallback={Package}
+              className="h-5 w-5 text-muted-foreground"
+              aria-label={pack.icon ? `${pack.name} icon` : undefined}
+            />
           </div>
           <div>
             <h3 className="font-semibold">{pack.name}</h3>

@@ -751,3 +751,74 @@ class TestCycloneDxEnumMappings(CycloneDxTestMixin, TestCase):
         dup_warnings = [w for w in warnings if "Duplicate threat-asset link" in w]
         self.assertEqual(len(dup_warnings), 1)
         self.assertIn("Shared Component", dup_warnings[0])
+
+    def test_multiple_scenarios_same_threat_asset_collapse_to_one_cit(self):
+        """Multiple CDX scenarios referencing the same (threat, asset) pair
+        must collapse onto a single ComponentInstanceThreat row (the
+        unique_together constraint) rather than raising IntegrityError.
+        All scenario bom-refs should be recorded in format_metadata and
+        the highest severity should win."""
+        json_data = {
+            "specFormat": "CycloneDX",
+            "specVersion": "2.0",
+            "blueprints": [
+                {
+                    "name": "Vault Test",
+                    "assets": [
+                        {
+                            "bom-ref": "asset-sys",
+                            "name": "Target System",
+                            "type": "component",
+                        }
+                    ],
+                }
+            ],
+            "threats": {
+                "threats": [
+                    {
+                        "bom-ref": "threat-ir-8",
+                        "name": "IR-8 Incident Response Plan",
+                        "affectedAssets": ["asset-sys"],
+                    }
+                ],
+                "scenarios": [
+                    {
+                        "bom-ref": "scenario-ir-8-a",
+                        "threat": "threat-ir-8",
+                        "affectedAssets": ["asset-sys"],
+                        "riskScore": {"level": "low"},
+                    },
+                    {
+                        "bom-ref": "scenario-ir-8-b",
+                        "threat": "threat-ir-8",
+                        "affectedAssets": ["asset-sys"],
+                        "riskScore": {"level": "high"},
+                    },
+                    {
+                        "bom-ref": "scenario-ir-8-c",
+                        "threat": "threat-ir-8",
+                        "affectedAssets": ["asset-sys"],
+                        "riskScore": {"level": "medium"},
+                    },
+                ],
+            },
+        }
+        tm, summary = self.adapter.import_data(json_data, self.org, self.user)
+        self.assertEqual(summary["scenarios"], 3)
+        instances = ComponentInstanceThreat.objects.filter(
+            component__threat_model=tm
+        )
+        # All 3 scenarios must collapse to exactly 1 CIT
+        self.assertEqual(instances.count(), 1)
+        cit = instances.first()
+        # Highest severity across scenarios (low, high, medium) must win
+        self.assertEqual(cit.inherent_severity, "high")
+        # All 3 bom-refs must be recorded in format_metadata
+        cdx_meta = cit.format_metadata.get("cyclonedx", {})
+        recorded_refs = [
+            s["scenario_bom_ref"]
+            for s in cdx_meta.get("scenarios", [])
+        ]
+        self.assertIn("scenario-ir-8-a", recorded_refs)
+        self.assertIn("scenario-ir-8-b", recorded_refs)
+        self.assertIn("scenario-ir-8-c", recorded_refs)

@@ -979,7 +979,7 @@ class CycloneDxAdapter(BaseAdapter):
 
         # 12. Scenarios -> instance threats
         for scenario_data in threats_block.get("scenarios", []):
-            self._import_scenario(scenario_data, threat_model, resolver)
+            self._import_scenario(scenario_data, threat_model, resolver, warnings)
             summary["scenarios"] += 1
 
         # 13. Risks
@@ -1413,7 +1413,7 @@ class CycloneDxAdapter(BaseAdapter):
             logger.warning(msg)
             warnings.append(msg)
 
-    def _import_scenario(self, scenario_data, threat_model, resolver):
+    def _import_scenario(self, scenario_data, threat_model, resolver, warnings):
         from apps.systems.models import DataFlow, OrgsystemComponent
         from apps.threats.models import (
             ComponentInstanceThreat,
@@ -1452,38 +1452,75 @@ class CycloneDxAdapter(BaseAdapter):
                 )
                 continue
 
-            cdx_meta = {"scenario_bom_ref": bom_ref}
-            if scenario_meta:
-                cdx_meta["scenario"] = scenario_meta
-
             if isinstance(target, OrgsystemComponent):
-                instance = ComponentInstanceThreat.objects.create(
+                instance, created = ComponentInstanceThreat.objects.get_or_create(
                     component=target,
                     threat_library=threat_lib,
-                    threat_name=threat_lib.name if threat_lib else "",
-                    threat_description=(
-                        threat_lib.description if threat_lib else ""
-                    ),
-                    inherent_severity=severity,
-                    intent=intent,
-                    access_level=access_level,
-                    format_metadata={"cyclonedx": cdx_meta},
+                    defaults={
+                        "threat_name": threat_lib.name if threat_lib else "",
+                        "threat_description": (
+                            threat_lib.description if threat_lib else ""
+                        ),
+                        "inherent_severity": severity,
+                        "intent": intent,
+                        "access_level": access_level,
+                    },
                 )
-                resolver.register("scenario", bom_ref, instance)
             elif isinstance(target, DataFlow):
-                instance = DataFlowInstanceThreat.objects.create(
+                instance, created = DataFlowInstanceThreat.objects.get_or_create(
                     data_flow=target,
                     threat_library=threat_lib,
-                    threat_name=threat_lib.name if threat_lib else "",
-                    threat_description=(
-                        threat_lib.description if threat_lib else ""
-                    ),
-                    inherent_severity=severity,
-                    intent=intent,
-                    access_level=access_level,
-                    format_metadata={"cyclonedx": cdx_meta},
+                    defaults={
+                        "threat_name": threat_lib.name if threat_lib else "",
+                        "threat_description": (
+                            threat_lib.description if threat_lib else ""
+                        ),
+                        "inherent_severity": severity,
+                        "intent": intent,
+                        "access_level": access_level,
+                    },
                 )
-                resolver.register("scenario", bom_ref, instance)
+            else:
+                continue
+
+            self._merge_scenario_metadata(
+                instance, bom_ref, scenario_meta, severity, created
+            )
+            resolver.register("scenario", bom_ref, instance)
+
+    @staticmethod
+    def _merge_scenario_metadata(instance, bom_ref, scenario_meta, severity, created):
+        """Fold a scenario's Tier-3 metadata into its (possibly shared) CIT/DFIT.
+
+        The unique_together constraint on (component, threat_library) means
+        multiple CDX scenarios that reference the same threat + asset collapse
+        onto a single instance-threat row. Rather than dropping every scenario
+        after the first (or crashing on the IntegrityError), accumulate each
+        scenario's bom-ref + Tier-3 metadata into a list and escalate the
+        instance's severity to the highest one observed across scenarios.
+        """
+        cdx_meta = instance.format_metadata.get("cyclonedx", {}) if not created else {}
+        scenarios_seen = cdx_meta.get("scenarios", [])
+        entry = {"scenario_bom_ref": bom_ref}
+        if scenario_meta:
+            entry["scenario"] = scenario_meta
+        scenarios_seen.append(entry)
+        cdx_meta["scenarios"] = scenarios_seen
+        # Keep legacy single-scenario key pointing at the most recent scenario
+        # for backward compatibility with any code reading scenario_bom_ref.
+        cdx_meta["scenario_bom_ref"] = bom_ref
+        if scenario_meta:
+            cdx_meta["scenario"] = scenario_meta
+        instance.format_metadata["cyclonedx"] = cdx_meta
+
+        severity_rank = {"low": 0, "medium": 1, "high": 2, "critical": 3}
+        update_fields = ["format_metadata"]
+        if not created and severity_rank.get(severity, 0) > severity_rank.get(
+            instance.inherent_severity, 0
+        ):
+            instance.inherent_severity = severity
+            update_fields.append("inherent_severity")
+        instance.save(update_fields=update_fields)
 
     def _import_risk(self, risk_data, threat_model, resolver):
         from apps.threats.models import (

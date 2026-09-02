@@ -26,11 +26,18 @@ services:
 
   backend:
     build:
-      context: ./backend
+      # The repository root, because the uv workspace's lock and its `mcp` member
+      # both sit above `backend/`. Matches docker-compose.yml.
+      context: .
+      dockerfile: backend/Dockerfile
       target: dev
     container_name: precogly-backend
     ports:
       - "8000:8000"
+    volumes:
+      - ./backend:/app/backend
+      - ./libraries:/app/libraries
+      - ./mcp:/app/mcp
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-precogly}:${POSTGRES_PASSWORD:-precogly_dev_password}@db:5432/${POSTGRES_DB:-precogly}
       DJANGO_SETTINGS_MODULE: config.settings.development
@@ -38,6 +45,8 @@ services:
       SECRET_KEY: ${SECRET_KEY:-dev-secret-key-change-in-production}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      # get_libraries_path() appends /packs to this. Points at the mounted repo dir.
+      LIBRARIES_PATH: /app/libraries
     depends_on:
       db:
         condition: service_healthy

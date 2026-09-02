@@ -10,6 +10,7 @@ const defaultData: Record<DiagramNodeType, Record<string, unknown>> = {
   datastore: { label: 'New Data Store', technology: '' },
   trustZone: { label: 'Trust Zone', trustLevel: 25, zoneColor: '#ef4444' },
   systemScope: { label: 'System Scope' },
+  stickyNote: { label: 'Add a note', noteColor: 'yellow', textSize: 'medium', bold: false, italic: false },
 }
 
 export function useCreateNode(notationStyle: DFDNotationStyle) {

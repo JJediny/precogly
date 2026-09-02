@@ -1,0 +1,12 @@
+# Workspace root. There is no package here — this file exists so that `backend`
+# and `mcp` resolve against one lock, which is what lets the backend depend on
+# `precogly-mcp` by source rather than by version. precogly-mcp is unreleased and
+# ships on Precogly's release train (mcp/docs/0008), so there is no version to
+# depend on.
+#
+# uv puts the lock at the workspace root, so `uv.lock` lives here rather than in
+# `backend/`. The backend image's build context is the repository root for that
+# reason.
+
+[tool.uv.workspace]
+members = ["backend", "mcp"]

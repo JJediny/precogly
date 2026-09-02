@@ -3,7 +3,7 @@ taxonomy: mitre-attack-ics
 mappings:
   # PLC threats
   - threat: plc-firmware-manipulation
-    entries: [T0857, T0839]
+    entries: [T1693.001, T1693.002]
   - threat: plc-logic-tampering
     entries: [T0843, T0821, T0836]
   - threat: plc-unauthorized-access
@@ -11,17 +11,17 @@ mappings:
 
   # RTU threats
   - threat: rtu-protocol-exploit
-    entries: [T0855, T0869]
+    entries: [T1692.001, T0869]
   - threat: rtu-spoofed-commands
-    entries: [T0855, T0856]
+    entries: [T1692.001, T1692.002]
 
   # SCADA threats
   - threat: scada-unauthorized-access
     entries: [T0859, T0886, T0819]
   - threat: scada-command-injection
-    entries: [T0855, T0821]
+    entries: [T1692.001, T0821]
   - threat: scada-data-manipulation
-    entries: [T0832, T0856]
+    entries: [T0832, T1692.002]
 
   # HMI threats
   - threat: hmi-unauthorized-access
@@ -67,16 +67,16 @@ mappings:
 
   # Field device threats
   - threat: sensor-spoofing
-    entries: [T0856, T0806]
+    entries: [T1692.002, T0806]
   - threat: sensor-physical-tampering
     entries: [T0800, T0816]
 
   # Data flow threats
   - threat: ot-protocol-mitm
-    entries: [T0842, T0855]
+    entries: [T0842, T1692.001]
   - threat: ot-unencrypted-traffic
     entries: [T0842, T0869]
   - threat: ot-command-replay
-    entries: [T0855, T0803]
+    entries: [T1692.001, T1691.001]
   - threat: it-ot-lateral-movement
     entries: [T0886, T0866]

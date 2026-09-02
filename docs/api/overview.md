@@ -145,6 +145,10 @@ All endpoints require authentication by default. The only exceptions are magic l
 | `/api/redoc/` | ReDoc |
 | `/api/schema/` | Raw OpenAPI 3.0 schema (YAML) |
 
+The generated OpenAPI documentation is the canonical, exhaustive reference for request
+fields, response schemas, filters, and status codes. The tables below provide a practical
+map of the public resources and custom actions.
+
 ## Endpoint reference
 
 ### Threat models
@@ -167,8 +171,13 @@ All endpoints require authentication by default. The only exceptions are magic l
 | `POST` | `/api/threat-models/{id}/remove_referenced_model/` | Remove model relationship |
 | `POST` | `/api/threat-models/{id}/add_pack/` | Attach a library pack |
 | `POST` | `/api/threat-models/{id}/remove_pack/` | Detach a library pack |
+| `GET` | `/api/threat-models/{id}/countermeasures-in-use/` | List countermeasures active in the model |
+| `GET` | `/api/threat-models/{id}/compliance_drift/` | Compare instance mappings with their library sources |
+| `POST` | `/api/threat-models/{id}/refresh_compliance/` | Refresh instance compliance mappings from libraries |
 | `POST` | `/api/threat-models/import/tm-library/` | Import from TM-Library JSON |
 | `GET` | `/api/threat-models/{id}/export/tm-library/` | Export as TM-Library JSON |
+| `POST` | `/api/threat-models/import/cyclonedx/` | Import from CycloneDX 2.0 TM-BOM JSON |
+| `GET` | `/api/threat-models/{id}/export/cyclonedx/` | Export as CycloneDX 2.0 TM-BOM JSON |
 
 **Reference images** (nested under threat model):
 
@@ -195,6 +204,9 @@ All endpoints require authentication by default. The only exceptions are magic l
 | `PUT/PATCH` | `/api/diagrams/{id}/` | Update DFD (triggers component sync for primary DFDs) |
 | `DELETE` | `/api/diagrams/{id}/` | Delete DFD |
 | `POST` | `/api/diagrams/create_for_threat_model/` | Create DFD from template for a threat model |
+| `GET` | `/api/diagrams/ai-availability/` | Check whether AI diagram generation is configured |
+| `POST` | `/api/diagrams/analyze-image/` | Analyze an uploaded architecture image |
+| `POST` | `/api/diagrams/generate-dfd/` | Generate DFD canvas data from an analyzed image |
 | `GET` | `/api/diagrams/{id}/delete_preview/` | Preview cascade before deletion |
 
 **DFD templates** (read-only):
@@ -252,10 +264,14 @@ All endpoints require authentication by default. The only exceptions are magic l
 | `GET` | `/api/component-threats/{id}/suggested_countermeasures/` | Countermeasure suggestions from library |
 | `POST` | `/api/component-threats/{id}/apply_countermeasure/` | Apply a library countermeasure |
 | `POST` | `/api/component-threats/{id}/recalculate_status/` | Recalculate threat status |
+| `POST` | `/api/component-threats/reorder/` | Reorder component threats |
+| `GET` | `/api/component-threats/ai_availability/` | Check AI suggestion availability |
+| `POST` | `/api/component-threats/suggest/` | Get AI-ranked threat suggestions |
 | `GET/POST` | `/api/flow-threats/` | List or create data flow instance threats |
 | `GET/PUT/PATCH/DELETE` | `/api/flow-threats/{id}/` | Flow threat CRUD |
 | `POST` | `/api/flow-threats/{id}/apply_countermeasure/` | Apply countermeasure to flow threat |
 | `POST` | `/api/flow-threats/{id}/recalculate_status/` | Recalculate flow threat status |
+| `POST` | `/api/flow-threats/reorder/` | Reorder data flow threats |
 
 ### Countermeasures
 
@@ -263,12 +279,17 @@ All endpoints require authentication by default. The only exceptions are magic l
 |--------|----------|-------------|
 | `GET/POST` | `/api/countermeasure-library/` | Browse or create library countermeasures |
 | `GET/PUT/PATCH/DELETE` | `/api/countermeasure-library/{id}/` | Library countermeasure CRUD |
-| `GET/POST` | `/api/component-countermeasures/` | List or create component instance countermeasures |
-| `GET/PUT/PATCH/DELETE` | `/api/component-countermeasures/{id}/` | Instance countermeasure CRUD |
-| `GET/POST` | `/api/flow-countermeasures/` | List or create flow instance countermeasures |
-| `GET/PUT/PATCH/DELETE` | `/api/flow-countermeasures/{id}/` | Flow countermeasure CRUD |
-| `GET/POST` | `/api/verification-tests/` | Verification test CRUD |
-| `GET/POST` | `/api/pentest-findings/` | Pentest finding CRUD |
+| `GET/POST` | `/api/countermeasures/` | List or create unified countermeasure instances |
+| `GET/PUT/PATCH/DELETE` | `/api/countermeasures/{id}/` | Countermeasure instance CRUD |
+| `POST` | `/api/countermeasures/{id}/link/` | Link a countermeasure to another component or flow threat |
+| `POST` | `/api/countermeasures/{id}/unlink/` | Unlink a countermeasure from a threat |
+| `POST` | `/api/countermeasures/reorder/` | Reorder countermeasures within a threat |
+| `GET/POST` | `/api/countermeasure-comments/` | List or create countermeasure history entries |
+| `GET/PUT/PATCH/DELETE` | `/api/countermeasure-comments/{id}/` | Countermeasure comment CRUD |
+| `GET/POST` | `/api/verification-tests/` | List or create verification tests |
+| `GET/PUT/PATCH/DELETE` | `/api/verification-tests/{id}/` | Verification test CRUD |
+| `GET/POST` | `/api/pentest-findings/` | List or create pentest findings |
+| `GET/PUT/PATCH/DELETE` | `/api/pentest-findings/{id}/` | Pentest finding CRUD |
 
 ### Compliance
 
@@ -279,8 +300,6 @@ All endpoints require authentication by default. The only exceptions are magic l
 | `GET/POST` | `/api/requirements/` | List or create standard requirements |
 | `GET/PUT/PATCH/DELETE` | `/api/requirements/{id}/` | Requirement CRUD |
 | `GET/POST` | `/api/countermeasure-standards/` | Library-level compliance mappings |
-| `GET/POST` | `/api/instance-countermeasure-standards/` | Instance-level component compliance mappings |
-| `GET/POST` | `/api/flow-instance-countermeasure-standards/` | Instance-level flow compliance mappings |
 
 ### Taxonomies
 
@@ -300,7 +319,17 @@ All endpoints require authentication by default. The only exceptions are magic l
 | `POST` | `/api/threat-models/{id}/risks/{id}/recalculate/` | Recalculate risk scores |
 | `POST` | `/api/threat-models/{id}/risks/{id}/add-threats/` | Link threats to a risk |
 | `POST` | `/api/threat-models/{id}/risks/{id}/remove-threats/` | Unlink threats from a risk |
+| `POST` | `/api/threat-models/{id}/risks/bulk-update/` | Bulk update risk response or owner |
 | `GET` | `/api/scoring-methods/` | List available risk scoring methods |
+
+### Threat personas and sources
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET/POST` | `/api/threat-models/{id}/threat-personas/` | List or create threat personas for a model |
+| `GET/PUT/PATCH/DELETE` | `/api/threat-models/{id}/threat-personas/{id}/` | Threat persona CRUD |
+| `GET` | `/api/threat-sources/` | List global threat source reference data |
+| `GET` | `/api/threat-sources/{id}/` | Threat source detail |
 
 ### Organizations and teams
 
@@ -358,6 +387,15 @@ All endpoints require authentication by default. The only exceptions are magic l
 |--------|----------|-------------|
 | `GET` | `/api/health/` | Health check |
 | `GET` | `/api/dashboard/stats/` | Dashboard statistics |
+
+### AI providers and usage
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET/POST` | `/api/ai-providers/` | List or create organization AI provider configurations |
+| `GET/PUT/PATCH/DELETE` | `/api/ai-providers/{id}/` | AI provider configuration CRUD |
+| `POST` | `/api/ai-providers/{id}/test-connection/` | Test an AI provider connection |
+| `GET` | `/api/ai-usage/summary/` | Organization AI usage summary |
 
 ## Error responses
 

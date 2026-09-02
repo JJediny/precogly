@@ -1,16 +1,37 @@
 import { useState } from 'react'
-import { ChevronDown, ChevronRight, Plus, ShieldAlert } from 'lucide-react'
+import { ChevronDown, ChevronRight, Plus, Pencil, ShieldAlert } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import { TaxonomyBadges } from '@/components/shared/TaxonomyBadges'
 import { useThreatModelThreats } from '@/features/threat-models/api/threats'
 import { AddThreatDialog } from '../threat-analysis/AddThreatDialog'
+import { AddCountermeasureDialog } from '../threat-analysis/AddCountermeasureDialog'
+import { useUpdateCountermeasure } from '@/features/threat-models/api/threats'
+import { parseCountermeasureId } from '@/features/threat-models/api/threats'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   deriveThreatStatus,
   THREAT_STATUS_CONFIG,
 } from '../../types/threat-analysis'
-import type { ComponentThreat } from '../../types/threat-analysis'
+import type { ComponentThreat, CountermeasureStatus } from '../../types/threat-analysis'
+
+const CONTROL_TYPES = ['preventive', 'detective', 'corrective', 'deterrent', 'recovery', 'compensating', 'procedural']
 
 const SEVERITY_COLORS: Record<string, string> = {
   low: 'bg-blue-100 text-blue-800',
@@ -36,6 +57,36 @@ export function CanvasThreatSection({
 }: CanvasThreatSectionProps) {
   const [isOpen, setIsOpen] = useState(true)
   const [showAddDialog, setShowAddDialog] = useState(false)
+  const [countermeasureThreat, setCountermeasureThreat] = useState<ComponentThreat | null>(null)
+  const [editingCountermeasure, setEditingCountermeasure] = useState<{
+    id: number
+    name: string
+    controlType: string
+  } | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editControlType, setEditControlType] = useState('preventive')
+  const updateCountermeasure = useUpdateCountermeasure()
+
+  const openCountermeasureEditor = (id: number, name: string, controlType?: string) => {
+    setEditingCountermeasure({ id, name, controlType: controlType || 'preventive' })
+    setEditName(name)
+    setEditControlType(controlType || 'preventive')
+  }
+
+  const saveCountermeasure = () => {
+    if (!editingCountermeasure || !editName.trim()) return
+    updateCountermeasure.mutate(
+      {
+        countermeasureId: editingCountermeasure.id,
+        data: { countermeasureName: editName.trim(), controlType: editControlType },
+      },
+      {
+        onSuccess: () => {
+          setEditingCountermeasure(null)
+        },
+      },
+    )
+  }
 
   const { data: threatData } = useThreatModelThreats(threatModelId)
 
@@ -126,6 +177,62 @@ export function CanvasThreatSection({
                             size="sm"
                           />
                         )}
+                        <div className="space-y-1 border-t pt-1.5">
+                          <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <span>Countermeasures ({threat.countermeasures.length})</span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 gap-1 px-1.5 text-xs"
+                              onClick={() => setCountermeasureThreat(threat)}
+                            >
+                              <Plus className="h-3 w-3" /> Add
+                            </Button>
+                          </div>
+                          {threat.countermeasures.map((countermeasure) => {
+                            const parsed = parseCountermeasureId(countermeasure.id)
+                            return (
+                              <div key={countermeasure.id} className="flex items-center gap-1.5">
+                                <span className="min-w-0 flex-1 truncate text-xs" title={countermeasure.countermeasureName}>
+                                  {countermeasure.countermeasureName || countermeasure.countermeasureId}
+                                </span>
+                                {parsed.type === 'backend' && parsed.id !== null ? (
+                                  <Select
+                                    value={countermeasure.status}
+                                    onValueChange={(status) => {
+                                      updateCountermeasure.mutate(
+                                        { countermeasureId: parsed.id!, data: { status: status as CountermeasureStatus } },
+                                      )
+                                    }}
+                                  >
+                                    <SelectTrigger className="h-6 w-[92px] text-[11px]">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {(['gap', 'planned', 'verified', 'waived'] as CountermeasureStatus[]).map((status) => (
+                                        <SelectItem key={status} value={status} className="text-xs">
+                                          {status}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                ) : (
+                                  <span className="text-[11px] capitalize text-muted-foreground">{countermeasure.status}</span>
+                                )}
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6"
+                                  aria-label={`Edit ${countermeasure.countermeasureName || 'countermeasure'}`}
+                                  onClick={() => openCountermeasureEditor(parsed.id!, countermeasure.countermeasureName || countermeasure.countermeasureId, countermeasure.controlType)}
+                                  disabled={parsed.type !== 'backend' || parsed.id === null}
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            )
+                          })}
+                        </div>
                       </div>
                     )
                   })}
@@ -150,6 +257,47 @@ export function CanvasThreatSection({
                 targetName={targetName}
                 threatModelId={threatModelId}
               />
+              {countermeasureThreat?.backendThreatId !== undefined && (
+                <AddCountermeasureDialog
+                  open={countermeasureThreat !== null}
+                  onOpenChange={(open) => { if (!open) setCountermeasureThreat(null) }}
+                  threatId={countermeasureThreat.backendThreatId}
+                  threatType={targetType}
+                  threatName={countermeasureThreat.threatName || 'Unnamed threat'}
+                  threatLibraryId={countermeasureThreat.threatId.startsWith('lib-') ? Number(countermeasureThreat.threatId.slice(4)) : null}
+                  threatModelId={threatModelId}
+                />
+              )}
+              <Dialog open={editingCountermeasure !== null} onOpenChange={(open) => { if (!open) setEditingCountermeasure(null) }}>
+                <DialogContent className="sm:max-w-[425px]">
+                  <DialogHeader>
+                    <DialogTitle>Edit Countermeasure</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="dfd-countermeasure-name">Name</Label>
+                      <Input
+                        id="dfd-countermeasure-name"
+                        value={editName}
+                        onChange={(event) => setEditName(event.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="dfd-countermeasure-type">Control type</Label>
+                      <Select value={editControlType} onValueChange={setEditControlType}>
+                        <SelectTrigger id="dfd-countermeasure-type"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {CONTROL_TYPES.map((type) => <SelectItem key={type} value={type}>{type}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setEditingCountermeasure(null)}>Cancel</Button>
+                    <Button onClick={saveCountermeasure} disabled={!editName.trim() || updateCountermeasure.isPending}>Save</Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </>
           )}
         </div>

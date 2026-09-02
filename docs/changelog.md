@@ -2,6 +2,49 @@
 
 All notable releases of Precogly are documented here.
 
+## v0.3.0
+
+**Release date:** July 31, 2026
+
+The v0.3.0 release expanded Precogly's interchange, AI-assisted modeling, risk,
+reporting, and guest-editor workflows.
+
+### Interchange and libraries
+
+- Added CycloneDX 2.0 Threat Modeling BOM import and export alongside TM-Library JSON.
+- Added full CAPEC, CWE, MITRE ATT&CK, and MITRE ATLAS taxonomy packs.
+- Enriched exported models with Precogly metadata while retaining standard format compatibility.
+
+### Threat modeling workflow
+
+- Unified component and data-flow countermeasures into a shareable countermeasure model.
+- Added countermeasure due dates, external ticket links, and history records.
+- Added the risk register with table and Kanban views.
+- Added the Pentests Scope workspace for deriving test priorities from a threat model.
+
+### AI assistance
+
+- Added grounded threat suggestions based on installed library packs.
+- Added per-organization bring-your-own-model provider configuration.
+- Added organization-level AI token usage tracking and reporting.
+
+### DFD and guest editor
+
+- Added DFD3 and Yourdon-DeMarco notation switching.
+- Added threat visibility on the DFD canvas and improved canvas interactions.
+- Expanded the guest editor with system context, threats, countermeasures, local
+  CycloneDX save/open, image export, and Word report generation.
+
+### Reports
+
+- Added CSV exports for threats, countermeasures, risks, and compliance coverage.
+- Added Word report generation for offline review.
+
+[View the full generated changelog](https://github.com/precogly/precogly/blob/main/CHANGELOG.md)
+or [download v0.3.0](https://github.com/precogly/precogly/releases/tag/v0.3.0).
+
+---
+
 ## v0.2.0
 
 **Release date:** May 26, 2026

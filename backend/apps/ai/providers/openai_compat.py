@@ -16,6 +16,7 @@ from typing import Any
 
 import requests
 
+from ..url_policy import URLPolicyError, check_url
 from .base import (
     AIProviderError,
     ChatProvider,
@@ -113,10 +114,21 @@ class OpenAICompatProvider(ChatProvider):
         completion. Connectivity problems are reported, not raised, so a UI can
         render the reason next to a "Test connection" button.
         """
+        try:
+            self._enforce_url_policy()
+        except URLPolicyError as err:
+            # Reported, not raised, so the operator can know
+            # what to change when looking at the output of the
+            # "Test Connection" button.
+            return ProviderHealth(ok=False, detail=str(err))
+
         url = self._url("/models")
         try:
             response = requests.get(
-                url, headers=self._headers(), timeout=self.config.request_timeout
+                url,
+                headers=self._headers(),
+                timeout=self.config.request_timeout,
+                allow_redirects=False,
             )
         except requests.exceptions.ConnectionError:
             return ProviderHealth(
@@ -149,11 +161,17 @@ class OpenAICompatProvider(ChatProvider):
     def _post(self, path: str, payload: dict) -> requests.Response:
         """POST JSON to ``path``, mapping transport failures to typed errors."""
         try:
+            self._enforce_url_policy()
+        except URLPolicyError as err:
+            raise AIProviderError(str(err)) from err
+
+        try:
             return requests.post(
                 self._url(path),
                 json=payload,
                 headers=self._headers(),
                 timeout=self.config.request_timeout,
+                allow_redirects=False,
             )
         except requests.exceptions.ConnectionError as err:
             raise AIProviderError(
@@ -166,6 +184,20 @@ class OpenAICompatProvider(ChatProvider):
                 f"{self.config.request_timeout}s. Try a smaller/faster model or "
                 "raise the request timeout."
             ) from err
+
+    def _enforce_url_policy(self) -> None:
+        """Refuse an endpoint the deployment's policy does not permit.
+
+        Checked immediately before each request rather than only when a config
+        was saved: a hostname that resolved publicly at save time can resolve
+        into the private range later, and a saved config may predate the policy
+        being tightened. The serializer runs the same check on write, but that
+        is for the error message — this is the control.
+
+        Applies to the operator-wide fallback too, not only to an organization's
+        saved config; :mod:`apps.ai.url_policy` says why one rule covers both.
+        """
+        check_url(self.config.base_url)
 
     def _url(self, path: str) -> str:
         return f"{self.config.base_url.rstrip('/')}{path}"

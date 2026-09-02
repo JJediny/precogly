@@ -20,7 +20,7 @@ export const InlineEditableLabel = memo(function InlineEditableLabel({
 }: InlineEditableLabelProps) {
   const { setNodes } = useReactFlow<DiagramNode>()
   const [editValue, setEditValue] = useState(label)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
   const hasCommittedRef = useRef(false)
   const originalLabelRef = useRef(label)
 
@@ -33,6 +33,10 @@ export const InlineEditableLabel = memo(function InlineEditableLabel({
       originalLabelRef.current = label
       setEditValue(label)
       requestAnimationFrame(() => {
+        if (inputRef.current) {
+          inputRef.current.style.height = 'auto'
+          inputRef.current.style.height = `${inputRef.current.scrollHeight}px`
+        }
         inputRef.current?.focus()
         inputRef.current?.select()
       })
@@ -42,9 +46,11 @@ export const InlineEditableLabel = memo(function InlineEditableLabel({
 
   // Update both local state (for fast input) and node data (for panel sync)
   const handleChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
       const value = e.target.value
       setEditValue(value)
+      e.target.style.height = 'auto'
+      e.target.style.height = `${e.target.scrollHeight}px`
       setNodes((nodes) =>
         nodes.map((n) =>
           n.id === nodeId
@@ -77,9 +83,10 @@ export const InlineEditableLabel = memo(function InlineEditableLabel({
   )
 
   const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLInputElement>) => {
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       e.stopPropagation()
-      if (e.key === 'Enter') {
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault()
         finishEdit(false)
       } else if (e.key === 'Escape') {
         finishEdit(true)
@@ -98,13 +105,12 @@ export const InlineEditableLabel = memo(function InlineEditableLabel({
   }, [])
 
   if (!isEditing) {
-    return <span title={label} className={className}>{label}</span>
+    return <span title={label} className={cn('whitespace-pre-line', className)}>{label}</span>
   }
 
   return (
-    <input
+    <textarea
       ref={inputRef}
-      type="text"
       value={editValue}
       onChange={handleChange}
       onKeyDown={handleKeyDown}
@@ -112,10 +118,11 @@ export const InlineEditableLabel = memo(function InlineEditableLabel({
       onClick={stopPropagation}
       onMouseDown={stopPropagation}
       onDoubleClick={stopPropagation}
+      rows={1}
       className={cn(
         'nodrag nopan nowheel',
         'bg-transparent border-b border-current outline-none',
-        'text-inherit font-inherit',
+        'text-inherit font-inherit resize-none overflow-hidden min-h-0',
         inputClassName
       )}
     />

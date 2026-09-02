@@ -45,14 +45,18 @@ taxonomies:
         reference_url: "https://attack.mitre.org/techniques/T0858/"
 
       # Persistence
-      - external_id: T0839
-        title: Module Firmware
-        description: "Adversaries may install malicious firmware on control system modules such as I/O modules or communication modules to maintain persistence below the operating system level."
-        reference_url: "https://attack.mitre.org/techniques/T0839/"
-      - external_id: T0857
-        title: System Firmware
-        description: "Adversaries may modify system firmware on controllers or embedded devices to maintain persistence and survive device reboots or firmware updates."
-        reference_url: "https://attack.mitre.org/techniques/T0857/"
+      - external_id: T1693
+        title: Modify Firmware
+        description: "Adversaries may install malicious or vulnerable firmware on control system devices to achieve persistence, impair process control, and inhibit response functions. Firmware is low-level software embedded in hardware that enables systems and devices to function properly and is commonly found in ICS environments."
+        reference_url: "https://attack.mitre.org/techniques/T1693/"
+      - external_id: T1693.001
+        title: "Modify Firmware: System Firmware"
+        description: "Adversaries may exploit firmware update mechanisms to install malicious or outdated firmware on accessible devices. Malicious modification of device firmware may provide an adversary with root access to a device, given firmware is one of the lowest programming abstraction layers."
+        reference_url: "https://attack.mitre.org/techniques/T1693/001/"
+      - external_id: T1693.002
+        title: "Modify Firmware: Module Firmware"
+        description: "Adversaries may install malicious or vulnerable firmware onto modular hardware devices. Control system devices often contain modular hardware with separate firmware from the main equipment, targeting other system components that may not have the same capabilities or level of integrity checking."
+        reference_url: "https://attack.mitre.org/techniques/T1693/002/"
       - external_id: T0843
         title: Program Download
         description: "Adversaries may download a modified program to a controller, replacing legitimate control logic with malicious logic that alters the physical process."
@@ -73,14 +77,18 @@ taxonomies:
         title: Activate Firmware Update Mode
         description: "Adversaries may activate firmware update mode on a controller to prevent it from executing control logic, causing a denial of control condition."
         reference_url: "https://attack.mitre.org/techniques/T0800/"
-      - external_id: T0803
-        title: Block Command Message
-        description: "Adversaries may block command messages between operators and controllers, preventing operators from sending control commands to the physical process."
-        reference_url: "https://attack.mitre.org/techniques/T0803/"
-      - external_id: T0804
-        title: Block Reporting Message
-        description: "Adversaries may block reporting messages from controllers to SCADA/HMI systems, preventing operators from receiving process status information."
-        reference_url: "https://attack.mitre.org/techniques/T0804/"
+      - external_id: T1691
+        title: Block Operational Technology Message
+        description: "Adversaries may disrupt industrial processes by blocking messages between systems and devices in OT/ICS environments. Messages typically fall into two categories: reporting messages that contain telemetry and command messages with control instructions. Their failure could inhibit response functions or create an unsafe condition with physical consequences."
+        reference_url: "https://attack.mitre.org/techniques/T1691/"
+      - external_id: T1691.001
+        title: "Block Operational Technology Message: Command Message"
+        description: "Adversaries may block a command message from reaching its intended target to prevent command execution. In OT networks, command messages are sent to provide instructions to control system devices. A blocked command message can inhibit response functions from correcting a disruption or unsafe condition."
+        reference_url: "https://attack.mitre.org/techniques/T1691/001/"
+      - external_id: T1691.002
+        title: "Block Operational Technology Message: Reporting Message"
+        description: "Adversaries may block or prevent a reporting message from reaching its intended target. In control systems, reporting messages contain telemetry data pertaining to the current state of equipment and the industrial process. By blocking these reporting messages, an adversary can potentially hide their actions from an operator."
+        reference_url: "https://attack.mitre.org/techniques/T1691/002/"
       - external_id: T0816
         title: Device Restart/Shutdown
         description: "Adversaries may restart or shut down control system devices such as PLCs, RTUs, or safety controllers to disrupt the physical process."
@@ -95,14 +103,18 @@ taxonomies:
         title: Modify Parameter
         description: "Adversaries may modify parameters and setpoints in controllers to alter the behavior of the physical process outside safe operating limits."
         reference_url: "https://attack.mitre.org/techniques/T0836/"
-      - external_id: T0855
-        title: Unauthorized Command Message
-        description: "Adversaries may send unauthorized command messages to controllers using industrial protocols to manipulate the physical process."
-        reference_url: "https://attack.mitre.org/techniques/T0855/"
-      - external_id: T0856
-        title: Spoof Reporting Message
-        description: "Adversaries may spoof reporting messages from controllers to SCADA/HMI, providing operators with false process data while the physical process is being manipulated."
-        reference_url: "https://attack.mitre.org/techniques/T0856/"
+      - external_id: T1692
+        title: Unauthorized Message
+        description: "Adversaries may send unauthorized messages to ICS systems and devices to evade defenses or manipulate processes. By injecting unauthorized messages, attackers can create false appearances of normal operation, trigger misleading alarms, or manipulate controls to disrupt processes."
+        reference_url: "https://attack.mitre.org/techniques/T1692/"
+      - external_id: T1692.001
+        title: "Unauthorized Message: Command Message"
+        description: "Adversaries may send unauthorized command messages to instruct control system assets to perform actions outside of their intended functionality, or without the logical preconditions to trigger their expected function. Command messages are used in ICS networks to give direct instructions to control systems devices."
+        reference_url: "https://attack.mitre.org/techniques/T1692/001/"
+      - external_id: T1692.002
+        title: "Unauthorized Message: Reporting Message"
+        description: "Adversaries may spoof reporting messages in control system environments for evasion and to impair process control. In control systems, reporting messages contain telemetry data pertaining to the current state of equipment and the industrial process. If an adversary has the ability to spoof reporting messages, they can impact the control system in multiple ways."
+        reference_url: "https://attack.mitre.org/techniques/T1692/002/"
 
       # Impact
       - external_id: T0813
@@ -110,8 +122,8 @@ taxonomies:
         description: "Adversaries may cause a denial of control condition by preventing operators from interacting with the physical process, potentially leading to unsafe states."
         reference_url: "https://attack.mitre.org/techniques/T0813/"
       - external_id: T0815
-        title: Denial of Service
-        description: "Adversaries may perform denial of service attacks against control system components, disrupting communication or processing capabilities."
+        title: Denial of View
+        description: "Adversaries may cause a denial of view to disrupt and prevent operator oversight on the status of an ICS environment. This may manifest itself as a temporary communication failure between a device and its control source, where the interface recovers and becomes available once the interference ceases."
         reference_url: "https://attack.mitre.org/techniques/T0815/"
       - external_id: T0826
         title: Loss of Availability

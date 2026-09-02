@@ -10,6 +10,7 @@ import {
   type Connection,
   type XYPosition,
   addEdge,
+  reconnectEdge,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { useOutletContext } from 'react-router-dom'
@@ -34,6 +35,7 @@ import { useCreateNode, useHandleDrop } from '@/features/dfd-editor/hooks/useCre
 import { type DFDNotationStyle, NOTATION_NODE_SIZES } from '@/features/dfd-editor/types/notation'
 import { GuestThreatSection } from './components/GuestThreatSection'
 import { guestNodeTypes, guestEdgeTypes } from './components/GuestNodeWrapper'
+import { useGuestEditor } from './context/GuestEditorContext'
 import type { GuestDiagramOutletContext } from './GuestLayout'
 
 function GuestDFDEditorContent() {
@@ -49,6 +51,9 @@ function GuestDFDEditorContent() {
     onNodesChange,
     onEdgesChange,
     undo,
+    redo,
+    canUndo,
+    canRedo,
     notationStyle,
     setNotationStyle,
     exportImageRef,
@@ -95,8 +100,9 @@ function GuestDFDEditorContent() {
   const [selectedEdge, setSelectedEdge] = useState<DiagramEdge | null>(null)
 
   // ReactFlow instance
-  const { screenToFlowPosition, getEdges, getViewport, setViewport, getNodesBounds } = useReactFlow()
+  const { screenToFlowPosition, getNodes, getEdges, getViewport, setViewport, getNodesBounds } = useReactFlow()
   const { x: viewportX, y: viewportY, zoom } = useViewport()
+  const guestEditor = useGuestEditor()
 
   // Parent relationship detection
   const { updateParentRelationships } = useParentRelationships()
@@ -172,7 +178,7 @@ function GuestDFDEditorContent() {
       return exportDiagramImage(format, filename, reactFlowWrapper.current, nodes, getViewport, setViewport, getNodesBounds, options)
     }
     return () => { exportImageRef.current = null }
-  }, [exportImageRef, title, nodes, getViewport, setViewport])
+  }, [exportImageRef, title, nodes, getNodesBounds, getViewport, setViewport])
 
   // Register capture image handler so the header can capture PNG bytes for the Word report
   useEffect(() => {
@@ -183,7 +189,7 @@ function GuestDFDEditorContent() {
     // Canvas re-mounted — invalidate cached image since user may edit the diagram
     onCacheImage(null)
     return () => { captureImageRef.current = null }
-  }, [captureImageRef, nodes, getViewport, setViewport, onCacheImage])
+  }, [captureImageRef, nodes, getNodesBounds, getViewport, setViewport, onCacheImage])
 
   // Handle node click
   const handleNodeClick = useCallback(
@@ -211,6 +217,28 @@ function GuestDFDEditorContent() {
     []
   )
 
+  const startEdgeEditing = useCallback((initialText: string) => {
+    setEdges((currentEdges) => currentEdges.map((edge) =>
+      edge.selected
+        ? { ...edge, data: { ...edge.data, label: initialText, isInlineEditing: true } }
+        : edge
+    ))
+  }, [setEdges])
+
+  const handleEdgeDoubleClick = useCallback(
+    (_event: React.MouseEvent, edge: DiagramEdge) => {
+      if (edge.type !== 'dataFlow') return
+      setEdges((currentEdges) => currentEdges.map((currentEdge) => {
+        if (currentEdge.type !== 'dataFlow') return currentEdge
+        return {
+          ...currentEdge,
+          data: { ...currentEdge.data, isInlineEditing: currentEdge.id === edge.id },
+        }
+      }))
+    },
+    [setEdges]
+  )
+
   // Handle double-click on node to enable inline label editing
   const handleNodeDoubleClick = useCallback(
     (_event: React.MouseEvent, node: DiagramNode) => {
@@ -236,7 +264,14 @@ function GuestDFDEditorContent() {
           )
         : nds
     )
-  }, [handlePaneClickForConnection, setNodes])
+    setEdges((eds) =>
+      eds.some((edge) => edge.data?.isInlineEditing)
+        ? eds.map((edge) =>
+            edge.data?.isInlineEditing ? { ...edge, data: { ...edge.data, isInlineEditing: false } } : edge
+          )
+        : eds
+    )
+  }, [handlePaneClickForConnection, setEdges, setNodes])
 
   const handleNodeDragStop = useCallback(() => {
     requestAnimationFrame(() => {
@@ -270,6 +305,13 @@ function GuestDFDEditorContent() {
     [nodes, setEdges]
   )
 
+  const handleReconnect = useCallback(
+    (oldEdge: DiagramEdge, connection: Connection) => {
+      setEdges((currentEdges) => reconnectEdge(oldEdge, connection, currentEdges) as DiagramEdge[])
+    },
+    [setEdges]
+  )
+
   // Sync selected node/edge with current data
   const currentSelectedNode = selectedNode
     ? (nodes.find((n) => n.id === selectedNode.id) as DiagramNode | undefined)
@@ -287,10 +329,92 @@ function GuestDFDEditorContent() {
     }
   }, [boundaryMode, cancelBoundaryMode])
 
+  // Keep keyboard deletion in sync with the guest threat state. React Flow
+  // only removes canvas items, while threats and countermeasures are held in
+  // separate guest-editor stores and are included in exports.
+  const handleDelete = useCallback(() => {
+    const currentNodes = getNodes() as DiagramNode[]
+    const currentEdges = getEdges() as DiagramEdge[]
+    const selectedNodes = currentNodes.filter((node) => node.selected)
+    const selectedEdges = currentEdges.filter((edge) => edge.selected)
+
+    if (selectedNodes.length === 0 && selectedEdges.length === 0) return
+
+    const selectedNodeIds = new Set(selectedNodes.map((node) => node.id))
+    const deletedTargetIds = new Set([
+      ...selectedNodeIds,
+      ...selectedEdges.map((edge) => edge.id),
+      ...currentEdges
+        .filter((edge) => selectedNodeIds.has(edge.source) || selectedNodeIds.has(edge.target))
+        .map((edge) => edge.id),
+    ])
+
+    if (guestEditor) {
+      for (const targetId of deletedTargetIds) {
+        for (const threat of guestEditor.getThreatsForTarget(targetId)) {
+          guestEditor.removeThreat(threat.id)
+        }
+      }
+    }
+
+    const boundaryIds = selectedNodes
+      .filter((node) => node.type === 'trustZone' || node.type === 'systemScope')
+      .map((node) => node.id)
+
+    const updatedNodes = currentNodes
+      .filter((node) => !selectedNodeIds.has(node.id))
+      .map((node) => {
+        if (node.parentId && boundaryIds.includes(node.parentId)) {
+          const parent = currentNodes.find((candidate) => candidate.id === node.parentId)
+          if (parent) {
+            return {
+              ...node,
+              parentId: undefined,
+              position: {
+                x: node.position.x + parent.position.x,
+                y: node.position.y + parent.position.y,
+              },
+            }
+          }
+        }
+        return node
+      })
+
+    const updatedEdges = currentEdges.filter(
+      (edge) =>
+        !selectedEdges.some((selectedEdge) => selectedEdge.id === edge.id) &&
+        !selectedNodeIds.has(edge.source) &&
+        !selectedNodeIds.has(edge.target)
+    )
+
+    setNodes(updatedNodes)
+    setEdges(updatedEdges)
+  }, [getEdges, getNodes, guestEditor, setEdges, setNodes])
+  const startNodeEditing = useCallback((initialText: string) => {
+    setNodes((currentNodes) => currentNodes.map((node) =>
+      node.selected
+        ? { ...node, data: { ...node.data, label: initialText, isInlineEditing: true } }
+        : node
+    ))
+  }, [setNodes])
+
+  const pasteNodeLabel = useCallback((text: string) => {
+    setNodes((currentNodes) => currentNodes.map((node) =>
+      node.selected
+        ? { ...node, data: { ...node.data, label: text, isInlineEditing: true } }
+        : node
+    ))
+  }, [setNodes])
+
   // Keyboard shortcuts (save is a no-op in guest — handled by header download)
   useKeyboardShortcuts({
     onUndo: undo,
+    onRedo: redo,
     onDeselect: handleDeselect,
+    onDelete: handleDelete,
+    onStartEdgeEditing: startEdgeEditing,
+    onStartNodeEditing: startNodeEditing,
+    onPasteText: pasteNodeLabel,
     enabled: true,
   })
 
@@ -318,11 +442,15 @@ function GuestDFDEditorContent() {
         notationStyle={notationStyle}
         onNotationChange={handleNotationChange}
         onExportImage={(format, options) => exportImageRef.current?.(format, options)}
+        onUndo={undo}
+        onRedo={redo}
+        canUndo={canUndo}
+        canRedo={canRedo}
       />
 
       <div className="flex flex-1 overflow-hidden">
         {/* Canvas */}
-        <div className="flex-1" ref={reactFlowWrapper} onMouseMove={handleMouseMove} onDragOver={handleDragOver} onDrop={handleDrop}>
+        <div className={`flex-1 ${connectionMode ? 'connection-mode' : ''}`} ref={reactFlowWrapper} onMouseMove={handleMouseMove} onDragOver={handleDragOver} onDrop={handleDrop}>
           <DFDNotationProvider notationStyle={notationStyle}>
             <ReactFlow
               nodes={nodes}
@@ -330,9 +458,12 @@ function GuestDFDEditorContent() {
               onNodesChange={onNodesChange}
               onEdgesChange={onEdgesChange}
               onConnect={handleConnect}
+              onReconnect={handleReconnect}
+              edgesReconnectable
               onNodeClick={handleNodeClick}
               onNodeDoubleClick={handleNodeDoubleClick}
               onEdgeClick={handleEdgeClick}
+              onEdgeDoubleClick={handleEdgeDoubleClick}
               onPaneClick={handlePaneClick}
               onNodeDragStop={handleNodeDragStop}
               nodeTypes={guestNodeTypes}
@@ -377,7 +508,7 @@ function GuestDFDEditorContent() {
             node={currentSelectedNode}
             onClose={() => setSelectedNode(null)}
             renderExtra={
-              currentSelectedNode.type !== 'trustZone' ? (
+              currentSelectedNode.type !== 'trustZone' && currentSelectedNode.type !== 'stickyNote' ? (
                 <GuestThreatSection
                   targetId={currentSelectedNode.id}
                   targetType={getNodeTargetType(currentSelectedNode)}

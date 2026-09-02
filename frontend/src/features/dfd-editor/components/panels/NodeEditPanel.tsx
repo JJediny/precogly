@@ -40,6 +40,7 @@ import type {
   DiagramNode,
   DiagramNodeType,
   DataSensitivity,
+  StickyNoteTextSize,
 } from '../../types'
 import {
   DATA_SENSITIVITY_CONFIG,
@@ -67,6 +68,7 @@ const nodeTypeConfig: Record<
   systemActor: { label: 'System Actor', icon: Server, color: 'text-slate-600' },
   trustZone: { label: 'Trust Zone', icon: Shield, color: 'text-orange-600' },
   systemScope: { label: 'System Scope', icon: Box, color: 'text-gray-600' },
+  stickyNote: { label: 'Sticky Note', icon: Box, color: 'text-amber-700' },
 }
 
 /**
@@ -332,28 +334,77 @@ export const NodeEditPanel = memo(function NodeEditPanel({
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {/* Common fields */}
-        <div className="space-y-2">
-          <Label htmlFor="node-label">Name</Label>
-          <Input
-            id="node-label"
-            value={node.data.label || ''}
-            onChange={(e) => updateNodeData({ label: e.target.value })}
-            placeholder={node.type === 'trustZone' ? 'e.g., Production VPC, DMZ...' : 'Enter name...'}
-          />
-        </div>
+        {node.type === 'stickyNote' ? (
+          <div className="space-y-2">
+            <Label htmlFor="node-label">Message</Label>
+            <Textarea
+              id="node-label"
+              value={node.data.label || ''}
+              onChange={(e) => updateNodeData({ label: e.target.value })}
+              placeholder="Enter note text..."
+              rows={3}
+            />
+          </div>
+        ) : (
+          <>
+            <div className="space-y-2">
+              <Label htmlFor="node-label">Name</Label>
+              <Input
+                id="node-label"
+                value={node.data.label || ''}
+                onChange={(e) => updateNodeData({ label: e.target.value })}
+                placeholder={node.type === 'trustZone' ? 'e.g., Production VPC, DMZ...' : 'Enter name...'}
+              />
+            </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="node-description">Description</Label>
-          <Textarea
-            id="node-description"
-            value={node.data.description || ''}
-            onChange={(e) => updateNodeData({ description: e.target.value })}
-            placeholder="Enter description..."
-            rows={3}
-          />
-        </div>
+            <div className="space-y-2">
+              <Label htmlFor="node-description">Description</Label>
+              <Textarea
+                id="node-description"
+                value={node.data.description || ''}
+                onChange={(e) => updateNodeData({ description: e.target.value })}
+                placeholder="Enter description..."
+                rows={3}
+              />
+            </div>
+          </>
+        )}
 
         <Separator />
+
+        {node.type === 'stickyNote' && (
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label>Note Color</Label>
+              <Select value={(node.data as { noteColor?: string }).noteColor || 'yellow'} onValueChange={(value) => updateNodeData({ noteColor: value })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="yellow">Yellow</SelectItem>
+                  <SelectItem value="blue">Blue</SelectItem>
+                  <SelectItem value="green">Green</SelectItem>
+                  <SelectItem value="pink">Pink</SelectItem>
+                  <SelectItem value="orange">Orange</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Text Size</Label>
+              <Select
+                value={(node.data as { textSize?: StickyNoteTextSize }).textSize || 'medium'}
+                onValueChange={(value) => updateNodeData({ textSize: value as StickyNoteTextSize })}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="small">Small</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="large">Large</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <label className="flex items-center gap-2 text-sm"><Checkbox checked={!!(node.data as { bold?: boolean }).bold} onCheckedChange={(checked) => updateNodeData({ bold: checked === true })} />Bold text</label>
+            <label className="flex items-center gap-2 text-sm"><Checkbox checked={!!(node.data as { italic?: boolean }).italic} onCheckedChange={(checked) => updateNodeData({ italic: checked === true })} />Italic text</label>
+          </div>
+        )}
 
         {/* Type-specific fields */}
         {(node.type === 'process' || node.type === 'datastore') && (

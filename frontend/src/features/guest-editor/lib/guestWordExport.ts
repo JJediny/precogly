@@ -54,6 +54,7 @@ function formatNodeType(type: string | undefined): string {
     case 'systemActor': return 'System Actor'
     case 'trustZone': return 'Trust Zone'
     case 'systemScope': return 'System Scope'
+    case 'stickyNote': return 'Sticky Note'
     default: return type ?? '—'
   }
 }
@@ -465,22 +466,41 @@ function buildCountermeasuresSection(data: GuestReportData, sectionNum: number):
     return children
   }
 
-  // Summary by control type
-  const controlTypeCounts: Record<string, number> = {}
+  // Summary by control function
+  const controlFunctionCounts: Record<string, number> = {}
   for (const cm of data.countermeasures) {
-    const label = capitalize(cm.controlType)
-    controlTypeCounts[label] = (controlTypeCounts[label] ?? 0) + 1
+    for (const fn of cm.controlFunction) {
+      const label = capitalize(fn)
+      controlFunctionCounts[label] = (controlFunctionCounts[label] ?? 0) + 1
+    }
+  }
+
+  // Summary by control nature
+  const controlNatureCounts: Record<string, number> = {}
+  for (const cm of data.countermeasures) {
+    const label = capitalize(cm.controlNature)
+    controlNatureCounts[label] = (controlNatureCounts[label] ?? 0) + 1
   }
 
   children.push(
-    h2(`${sectionNum}.1 Summary`),
+    h2(`${sectionNum}.1 Summary by Function`),
     spacer(),
     buildTable(
       [4680, 4680],
-      ['Control Type', 'Count'],
+      ['Control Function', 'Count'],
       [
-        ...Object.entries(controlTypeCounts).map(([type, count]) => [type, String(count)]),
-        ['Total', String(data.countermeasures.length)],
+        ...Object.entries(controlFunctionCounts).map(([type, count]) => [type, String(count)]),
+      ],
+    ),
+    spacer(),
+    h2(`${sectionNum}.2 Summary by Nature`),
+    spacer(),
+    buildTable(
+      [4680, 4680],
+      ['Control Nature', 'Count'],
+      [
+        ...Object.entries(controlNatureCounts).map(([type, count]) => [type, String(count)]),
+        ['Total Countermeasures', String(data.countermeasures.length)],
       ],
     ),
     spacer(),
@@ -491,16 +511,17 @@ function buildCountermeasuresSection(data: GuestReportData, sectionNum: number):
 
   // Main countermeasures table
   children.push(
-    h2(`${sectionNum}.2 Countermeasure Details`),
+    h2(`${sectionNum}.3 Countermeasure Details`),
     spacer(),
     buildTable(
-      [2160, 1560, 2160, 3480],
-      ['Countermeasure', 'Control Type', 'Associated Threat', 'Description'],
+      [1800, 1560, 1200, 1800, 3000],
+      ['Countermeasure', 'Control Function', 'Control Nature', 'Associated Threat', 'Description'],
       data.countermeasures.map((cm) => {
         const associatedThreat = threatMap.get(cm.threatId)
         return [
           cm.name,
-          capitalize(cm.controlType),
+          cm.controlFunction.map(capitalize).join(', '),
+          capitalize(cm.controlNature),
           associatedThreat?.name ?? '—',
           cm.description || '—',
         ]

@@ -643,7 +643,7 @@ depends_on:
 
 ## Validation
 
-Pack validation runs automatically when you click **Import** in the UI. If issues are found, you will see a dialog listing each problem with a suggested fix. Both warnings and errors block import. Fix the issues in your YAML files and re-import.
+Pack validation runs automatically when you click **Import** in the UI. If issues are found, you will see a dialog listing each problem with a suggested fix. Errors block import and must be fixed. Warnings pause the import for review; if they are acceptable, click **Import Anyway** to continue.
 
 You can also run validation explicitly via the API:
 

@@ -103,6 +103,7 @@ export interface CycloneDxControl {
   category?: string
   effectiveness?: { percentage?: number }
   mitigations?: string[]
+  properties?: CycloneDxProperty[]
 }
 
 export interface CycloneDxThreatsBlock {

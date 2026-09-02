@@ -1,0 +1,55 @@
+# Gitleaks configuration.
+#
+# The default rule set does the work; this file exists for one rule it does not
+# have. Verified against gitleaks 8.30.1 on 2026-08-22: a Django SECRET_KEY is
+# not detected by any default rule, in any form — not a real one, not the
+# placeholder this repo ships. For a Django application that is the single
+# highest-value secret in the tree, since it signs sessions and password-reset
+# tokens, so forging one is a full authentication bypass.
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "django-secret-key"
+description = "Django SECRET_KEY committed as a literal"
+
+# Two forms, because a leaked key would take the second one. `.env` is
+# gitignored at the root and in `backend/` and `frontend/`, so the way a real
+# key reaches a commit is a `git add -f`, a rename past the ignore, or a paste
+# into a settings module or a compose override. The `KEY=value` form covers the
+# first two; the quoted form covers the third.
+# The value class excludes a backslash, which is load-bearing and was not
+# obvious. Without it, this rule reported two findings on 2026-08-22, both in
+# `search/search_index.json` on the generated gh-pages branch: minified JSON
+# stores a newline as the two characters `\` and `n`, neither of which is
+# whitespace, so the match ran past the end of the documented placeholder and
+# glued it to the following line — `SECRET_KEY=your-random-secret-key-here` plus
+# `POSTGRES_PASSWORD=…` scored 5.25 as one blob. A real key never contains a
+# backslash, so stopping there costs nothing and both findings go away.
+regex = '''(?i)\b(?:django[_-])?secret[_-]?key\b\s*[:=]\s*["']?([^\s"'\\]{40,})["']?'''
+secretGroup = 1
+keywords = ["secret_key", "secretkey", "secret-key"]
+
+# Measured 2026-08-22 rather than copied from gitleaks' generic rule, which
+# uses 3.7. Shannon entropy, bits per character:
+#
+#   3.17  "your-secret-key-here"                     .env.example
+#   3.86  "django-insecure-change-me-in-production"  backend/config/settings/base.py
+#   ---- 4.5, here ----
+#   5.31  openssl rand -base64 48                    the CI throwaway in ci.yml
+#   5.35  django-admin startproject's generated key
+#   5.48  get_random_secret_key()
+#
+# The gap is wide — 0.64 above the noisiest placeholder, 0.81 below the
+# weakest real key — so the threshold is not finely balanced and should not
+# need tuning. Lower it and the two placeholders above start failing every
+# build; raise it past 5.3 and real keys start passing.
+#
+# An earlier draft allowlisted the `django-insecure-` prefix so the committed
+# placeholder would not fire. Measuring killed that: `startproject` generates
+# real keys behind the same prefix, so the allowlist would have created a
+# blind spot on the exact value most likely to be committed by accident. The
+# entropy floor separates them without one, and the placeholder is excluded
+# twice over — it is 39 characters, under the length gate as well.
+entropy = 4.5

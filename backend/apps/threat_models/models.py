@@ -7,14 +7,56 @@ from django.db import models
 from django.db.models.signals import post_delete
 from django.dispatch import receiver
 
+from apps.compliance.models import StandardFramework
 from apps.core.models import TimestampedModel
+from apps.core.tenancy import Tenancy
 from apps.organizations.models import Organization
 from apps.systems.models import Orgsystem
-from apps.compliance.models import StandardFramework
+
+
+class ThreatModelQuerySet(models.QuerySet):
+    """Queries about who may read which threat models."""
+
+    def visible_to(self, user):
+        """Narrow to the threat models `user` is allowed to read.
+
+        Organization membership is the outer bound. Within it, a security team member
+        reads every model; everyone else reads the models their teams own, plus the
+        ones owned by no team — `owning_team` is nullable for records predating the
+        field, and there is no team on them to check against.
+
+        This queryset is the entire read boundary. `CanWrite` and `IsSecurityTeam` both
+        return `True` for safe methods (`apps/core/permissions.py`), so nothing else
+        narrows a read, and the MCP endpoint has no permission classes running at all —
+        it resolves a user from a bearer token and calls this.
+        """
+        org_ids = user.organization_memberships.values_list(
+            "organization_id", flat=True
+        )
+        visible = self.filter(organization_id__in=org_ids)
+
+        # Security team status is not scoped to an organization: being on one
+        # organization's security team grants full visibility in every organization the
+        # user belongs to, including ones where they are a plain member. That is
+        # precogly/precogly#209, still open. Reproduced here deliberately — this method
+        # exists to give the rule one home, not to change it.
+        if user.organization_memberships.filter(role="security_team").exists():
+            return visible
+
+        team_ids = user.team_memberships.values_list("team_id", flat=True)
+        return visible.filter(
+            models.Q(owning_team_id__in=team_ids) | models.Q(owning_team__isnull=True)
+        )
 
 
 class ThreatModel(TimestampedModel):
     """Threat model."""
+
+    # One of the seven models carrying `organization` directly, and the anchor most of
+    # the rest of the schema reaches an organization through.
+    tenancy = Tenancy.TENANT_OWNED
+
+    objects = ThreatModelQuerySet.as_manager()
 
     class Criticality(models.TextChoices):
         LOW = "low", "Low"
@@ -77,6 +119,8 @@ class ThreatModel(TimestampedModel):
 class ThreatModelOrgsystem(models.Model):
     """Association between threat model and orgsystem."""
 
+    tenancy = Tenancy.TENANT_OWNED
+
     threat_model = models.ForeignKey(
         ThreatModel,
         on_delete=models.CASCADE,
@@ -97,6 +141,10 @@ class ThreatModelOrgsystem(models.Model):
 
 class ThreatModelLibraryPack(models.Model):
     """Association between threat model and library pack."""
+
+    # The link is tenant-owned even though the pack it names is not: which packs a
+    # threat model has connected is that organization's business.
+    tenancy = Tenancy.TENANT_OWNED
 
     threat_model = models.ForeignKey(
         ThreatModel,
@@ -119,6 +167,8 @@ class ThreatModelLibraryPack(models.Model):
 class ThreatModelRelationship(TimestampedModel):
     """Relationship between threat models."""
 
+    tenancy = Tenancy.TENANT_OWNED
+
     class RelationType(models.TextChoices):
         DEPENDS_ON = "depends_on", "Depends On"
         SUBSYSTEM_OF = "subsystem_of", "Subsystem Of"
@@ -138,7 +188,11 @@ class ThreatModelRelationship(TimestampedModel):
     relation_type = models.CharField(max_length=20, choices=RelationType.choices)
 
     class Meta:
-        unique_together = ["source_threat_model", "target_threat_model", "relation_type"]
+        unique_together = [
+            "source_threat_model",
+            "target_threat_model",
+            "relation_type",
+        ]
 
     def __str__(self):
         return f"{self.source_threat_model} {self.relation_type} {self.target_threat_model}"
@@ -146,6 +200,8 @@ class ThreatModelRelationship(TimestampedModel):
 
 class ThreatModelFramework(models.Model):
     """Association between threat model and compliance framework."""
+
+    tenancy = Tenancy.TENANT_OWNED
 
     threat_model = models.ForeignKey(
         ThreatModel,
@@ -167,6 +223,8 @@ class ThreatModelFramework(models.Model):
 
 class ThreatModelReferenceImage(TimestampedModel):
     """Reference image for threat model (whiteboard photos, architecture diagrams, etc.)."""
+
+    tenancy = Tenancy.TENANT_OWNED
 
     threat_model = models.ForeignKey(
         ThreatModel,
@@ -206,6 +264,8 @@ class ThreatModelReferenceImage(TimestampedModel):
 class OutOfScopeItem(TimestampedModel):
     """Out-of-scope item for a threat model."""
 
+    tenancy = Tenancy.TENANT_OWNED
+
     threat_model = models.ForeignKey(
         ThreatModel,
         on_delete=models.CASCADE,
@@ -223,6 +283,8 @@ class OutOfScopeItem(TimestampedModel):
 
 class UseCase(TimestampedModel):
     """Use case associated with a threat model (CycloneDX 2.0 TM-BOM)."""
+
+    tenancy = Tenancy.TENANT_OWNED
 
     threat_model = models.ForeignKey(
         ThreatModel,

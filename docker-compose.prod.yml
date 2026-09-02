@@ -1,7 +1,8 @@
 services:
   backend:
     build:
-      context: ./backend
+      # No context here: compose merges `build` key by key, so the base file's
+      # `context: .` and `dockerfile:` carry over and only the target differs.
       target: prod
     volumes: []
     ports: []

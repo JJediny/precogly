@@ -7,6 +7,7 @@ import {
   ShieldX,
   Plus,
   Trash2,
+  Pencil,
   X,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -34,7 +35,7 @@ import {
   GUEST_CIA_LEVELS,
   GUEST_ASSUMPTION_VALIDITY,
 } from '../types'
-import type { GuestDataAsset, GuestAssumption } from '../types'
+import type { GuestDataAsset, GuestAssumption, GuestOutOfScopeItem } from '../types'
 
 type ContextView = 'session' | 'system' | 'assets' | 'assumptions' | 'out-of-scope'
 
@@ -708,12 +709,31 @@ function OutOfScopeView() {
   const guestEditor = useGuestEditor()
   const [newName, setNewName] = useState('')
   const [newReason, setNewReason] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
 
   if (!guestEditor) return null
 
   const handleAdd = () => {
     if (!newName.trim()) return
-    guestEditor.addOutOfScopeItem({ name: newName.trim(), reason: newReason.trim() })
+    const item = { name: newName.trim(), reason: newReason.trim() }
+    if (editingId) {
+      guestEditor.updateOutOfScopeItem(editingId, item)
+    } else {
+      guestEditor.addOutOfScopeItem(item)
+    }
+    setNewName('')
+    setNewReason('')
+    setEditingId(null)
+  }
+
+  const handleEdit = (item: GuestOutOfScopeItem) => {
+    setEditingId(item.id)
+    setNewName(item.name)
+    setNewReason(item.reason)
+  }
+
+  const handleCancelEdit = () => {
+    setEditingId(null)
     setNewName('')
     setNewReason('')
   }
@@ -734,13 +754,20 @@ function OutOfScopeView() {
                   <p className="text-xs text-muted-foreground">{item.reason}</p>
                 )}
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => guestEditor.removeOutOfScopeItem(item.id)}
-              >
-                <Trash2 className="h-3.5 w-3.5 text-destructive" />
-              </Button>
+              <div className="flex items-center gap-1 ml-2">
+                <Button variant="ghost" size="sm" onClick={() => handleEdit(item)}>
+                  <Pencil className="h-3.5 w-3.5" />
+                  <span className="sr-only">Edit {item.name}</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => guestEditor.removeOutOfScopeItem(item.id)}
+                >
+                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                  <span className="sr-only">Delete {item.name}</span>
+                </Button>
+              </div>
             </div>
           ))}
         </div>
@@ -765,9 +792,13 @@ function OutOfScopeView() {
           }}
         />
         <Button variant="outline" size="sm" onClick={handleAdd} disabled={!newName.trim()}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Item
+          {editingId ? 'Update Item' : 'Add Item'}
         </Button>
+        {editingId && (
+          <Button variant="ghost" size="sm" onClick={handleCancelEdit}>
+            Cancel
+          </Button>
+        )}
       </div>
     </div>
   )

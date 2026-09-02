@@ -204,11 +204,15 @@ export function GuestThreatDialog({
 
           <div className="space-y-2">
             <Label htmlFor="threat-category">STRIDE Category</Label>
-            <Select value={category} onValueChange={setCategory}>
+            <Select
+              value={category || 'none'}
+              onValueChange={(value) => setCategory(value === 'none' ? '' : value)}
+            >
               <SelectTrigger id="threat-category">
                 <SelectValue placeholder="Select a category..." />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="none">None</SelectItem>
                 {STRIDE_CATEGORIES.map((opt) => (
                   <SelectItem key={opt.value} value={opt.value}>
                     {opt.label}

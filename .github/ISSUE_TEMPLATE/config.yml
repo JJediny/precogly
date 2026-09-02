@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Discussions & Community
+    url: https://github.com/precogly/precogly/discussions
+    about: Ask questions, discuss architecture, or chat with the Precogly community.
+  - name: Discord Community
+    url: https://discord.gg/uBFZGJzpYa
+    about: Join the real-time community chat on Discord.

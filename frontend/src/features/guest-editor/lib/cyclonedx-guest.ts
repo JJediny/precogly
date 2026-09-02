@@ -13,6 +13,8 @@ import type {
   GuestDataAsset,
   GuestAssumption,
   ThreatStatus,
+  ControlFunction,
+  ControlNature,
 } from '../types'
 import type {
   CycloneDxDocument,
@@ -241,7 +243,17 @@ export function serializeGuestToCycloneDx(
       status: 'recommended',
     }
     if (c.description) control.description = c.description
-    if (c.controlType) control.category = c.controlType
+    if (c.controlFunction.length) control.category = c.controlFunction[0]
+
+    // Store full control function/nature as properties for lossless round-trip
+    const controlProperties: CycloneDxProperty[] = []
+    if (c.controlFunction.length) {
+      controlProperties.push({ name: 'precogly:control-functions', value: c.controlFunction.join(',') })
+    }
+    if (c.controlNature) {
+      controlProperties.push({ name: 'precogly:control-nature', value: c.controlNature })
+    }
+    if (controlProperties.length) control.properties = controlProperties
 
     // Link to threat bom-ref via mitigations
     const threatRef = threatIdToBomRef.get(c.threatId)
@@ -817,14 +829,16 @@ function reconstructCountermeasures(
       }
     }
 
-    const controlType = (control.category ?? 'preventive') as GuestCountermeasure['controlType']
+    // Extract control function/nature from properties (new format) or fall back to category (old format)
+    const { controlFunction, controlNature } = extractControlFields(control)
 
     return {
       id: control['bom-ref'] || `countermeasure-${index}`,
       threatId,
       name: control.name,
       description: control.description ?? '',
-      controlType,
+      controlFunction,
+      controlNature,
       createdAt: new Date().toISOString(),
     }
   })
@@ -919,6 +933,47 @@ function getCategoryName(strideId: string): string {
     'elevation-of-privilege': 'Elevation of Privilege',
   }
   return names[strideId] ?? strideId
+}
+
+const VALID_CONTROL_FUNCTIONS: ControlFunction[] = ['preventive', 'detective', 'corrective', 'deterrent', 'recovery', 'compensating']
+const VALID_CONTROL_NATURES: ControlNature[] = ['technical', 'administrative', 'physical']
+
+/**
+ * Extract controlFunction and controlNature from a CycloneDX control.
+ * Handles both new format (with precogly:control-functions/nature properties)
+ * and old format (single category field that mixed function and nature).
+ */
+function extractControlFields(control: CycloneDxControl): {
+  controlFunction: ControlFunction[]
+  controlNature: ControlNature
+} {
+  const properties = control.properties ?? []
+  const functionsProp = properties.find((p) => p.name === 'precogly:control-functions')
+  const natureProp = properties.find((p) => p.name === 'precogly:control-nature')
+
+  if (functionsProp) {
+    // New format: read from properties
+    const parsedFunctions = functionsProp.value
+      .split(',')
+      .filter((f): f is ControlFunction => VALID_CONTROL_FUNCTIONS.includes(f as ControlFunction))
+    const parsedNature = VALID_CONTROL_NATURES.includes(natureProp?.value as ControlNature)
+      ? (natureProp!.value as ControlNature)
+      : 'technical'
+    return {
+      controlFunction: parsedFunctions.length > 0 ? parsedFunctions : ['preventive'],
+      controlNature: parsedNature,
+    }
+  }
+
+  // Old format migration: category was a single value mixing function and nature
+  const oldCategory = control.category ?? 'preventive'
+  if (oldCategory === 'procedural') {
+    return { controlFunction: ['preventive'], controlNature: 'administrative' }
+  }
+  const migratedFunction = VALID_CONTROL_FUNCTIONS.includes(oldCategory as ControlFunction)
+    ? (oldCategory as ControlFunction)
+    : 'preventive'
+  return { controlFunction: [migratedFunction], controlNature: 'technical' }
 }
 
 function generateUUID(): string {

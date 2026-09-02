@@ -11,9 +11,10 @@ import {
   type Connection,
   type XYPosition,
   addEdge,
+  reconnectEdge,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { ArrowLeft, Save, Clock, Loader2, Pencil, Trash2, ShieldAlert } from 'lucide-react'
+import { ArrowLeft, Save, Clock, Loader2, Pencil, Trash2, ShieldAlert, Info } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DeleteDFDDialog } from '@/features/threat-models/components'
 import {
@@ -81,6 +82,9 @@ function DFDEditorContent() {
     saveNow,
     updateTitle,
     undo,
+    redo,
+    canUndo,
+    canRedo,
     hasUnsavedChanges,
     lastSaved,
   } = useDiagramState({
@@ -242,6 +246,28 @@ function DFDEditorContent() {
     []
   )
 
+  const startEdgeEditing = useCallback((initialText: string) => {
+    setEdges((currentEdges) => currentEdges.map((edge) =>
+      edge.selected
+        ? { ...edge, data: { ...edge.data, label: initialText, isInlineEditing: true } }
+        : edge
+    ))
+  }, [setEdges])
+
+  const handleEdgeDoubleClick = useCallback(
+    (_event: React.MouseEvent, edge: DiagramEdge) => {
+      if (edge.type !== 'dataFlow') return
+      setEdges((currentEdges) => currentEdges.map((currentEdge) => {
+        if (currentEdge.type !== 'dataFlow') return currentEdge
+        return {
+          ...currentEdge,
+          data: { ...currentEdge.data, isInlineEditing: currentEdge.id === edge.id },
+        }
+      }))
+    },
+    [setEdges]
+  )
+
   // Handle double-click on node to enable inline label editing
   const handleNodeDoubleClick = useCallback(
     (_event: React.MouseEvent, node: DiagramNode) => {
@@ -268,9 +294,16 @@ function DFDEditorContent() {
           )
         : nds
     )
+    setEdges((eds) =>
+      eds.some((edge) => edge.data?.isInlineEditing)
+        ? eds.map((edge) =>
+            edge.data?.isInlineEditing ? { ...edge, data: { ...edge.data, isInlineEditing: false } } : edge
+          )
+        : eds
+    )
     // Boundary source is NOT cleared here — React Flow fires onPaneClick
     // alongside onNodeClick for container nodes (trust zones)
-  }, [handlePaneClickForConnection, setNodes])
+  }, [handlePaneClickForConnection, setEdges, setNodes])
 
   // Handle node drag end - update parent relationships
   const handleNodeDragStop = useCallback(
@@ -310,6 +343,13 @@ function DFDEditorContent() {
       setEdges((eds) => addEdge(newEdge, eds) as DiagramEdge[])
     },
     [nodes, setEdges]
+  )
+
+  const handleReconnect = useCallback(
+    (oldEdge: DiagramEdge, connection: Connection) => {
+      setEdges((currentEdges) => reconnectEdge(oldEdge, connection, currentEdges) as DiagramEdge[])
+    },
+    [setEdges]
   )
 
   // Handle template insertion
@@ -373,6 +413,22 @@ function DFDEditorContent() {
     }
   }, [boundaryMode, cancelBoundaryMode])
 
+  const startNodeEditing = useCallback((initialText: string) => {
+    setNodes((currentNodes) => currentNodes.map((node) =>
+      node.selected
+        ? { ...node, data: { ...node.data, label: initialText, isInlineEditing: true } }
+        : node
+    ))
+  }, [setNodes])
+
+  const pasteNodeLabel = useCallback((text: string) => {
+    setNodes((currentNodes) => currentNodes.map((node) =>
+      node.selected
+        ? { ...node, data: { ...node.data, label: text, isInlineEditing: true } }
+        : node
+    ))
+  }, [setNodes])
+
   // Wrap saveNow for keyboard shortcut to pass notation style
   const handleKeyboardSave = useCallback(async () => {
     await saveNow(notationStyle)
@@ -382,7 +438,11 @@ function DFDEditorContent() {
   useKeyboardShortcuts({
     onSave: handleKeyboardSave,
     onUndo: undo,
+    onRedo: redo,
     onDeselect: handleDeselect,
+    onStartEdgeEditing: startEdgeEditing,
+    onStartNodeEditing: startNodeEditing,
+    onPasteText: pasteNodeLabel,
     enabled: true,
   })
 
@@ -438,7 +498,7 @@ function DFDEditorContent() {
         .toLowerCase()
       return exportDiagramImage(format, filename, reactFlowWrapper.current, nodes, getViewport, setViewport, getNodesBounds, options)
     },
-    [diagramTitle, nodes, getViewport, setViewport]
+    [diagramTitle, getNodesBounds, getViewport, nodes, setViewport]
   )
 
   // Handle DFD deletion
@@ -580,6 +640,16 @@ function DFDEditorContent() {
         </div>
       </div>
 
+      {/* Reference diagram banner */}
+      {diagram && !diagram.isPrimary && (
+        <div className="flex items-center gap-2 px-4 py-1.5 bg-amber-50 border-b border-amber-200 text-amber-800 text-sm">
+          <Info className="h-4 w-4 shrink-0" />
+          <span>
+            This is a reference diagram. Components here are not synced to threat analysis.
+          </span>
+        </div>
+      )}
+
       {/* Toolbar */}
       <DiagramToolbar
         connectionMode={connectionMode}
@@ -595,11 +665,15 @@ function DFDEditorContent() {
         notationStyle={notationStyle}
         onNotationChange={handleNotationChange}
         onExportImage={handleExportImage}
+        onUndo={undo}
+        onRedo={redo}
+        canUndo={canUndo}
+        canRedo={canRedo}
       />
 
       <div className="flex flex-1 overflow-hidden">
         {/* Canvas */}
-        <div className="flex-1" ref={reactFlowWrapper} onMouseMove={handleMouseMove} onDragOver={handleDragOver} onDrop={handleDrop}>
+        <div className={`flex-1 ${connectionMode ? 'connection-mode' : ''}`} ref={reactFlowWrapper} onMouseMove={handleMouseMove} onDragOver={handleDragOver} onDrop={handleDrop}>
           <DFDNotationProvider notationStyle={notationStyle}>
             <ReactFlow
               nodes={nodes}
@@ -607,9 +681,12 @@ function DFDEditorContent() {
               onNodesChange={onNodesChange}
               onEdgesChange={onEdgesChange}
               onConnect={handleConnect}
+              onReconnect={handleReconnect}
+              edgesReconnectable
               onNodeClick={handleNodeClick}
               onNodeDoubleClick={handleNodeDoubleClick}
               onEdgeClick={handleEdgeClick}
+              onEdgeDoubleClick={handleEdgeDoubleClick}
               onPaneClick={handlePaneClick}
               onNodeDragStop={handleNodeDragStop}
               nodeTypes={canvasNodeTypes}
@@ -656,7 +733,7 @@ function DFDEditorContent() {
             onClose={() => setSelectedNode(null)}
             threatModelId={threatModelId}
             renderExtra={
-              currentSelectedNode.type !== 'trustZone' ? (
+              currentSelectedNode.type !== 'trustZone' && currentSelectedNode.type !== 'stickyNote' ? (
                 <CanvasThreatSection
                   threatModelId={threatModelId}
                   canvasId={currentSelectedNode.id}

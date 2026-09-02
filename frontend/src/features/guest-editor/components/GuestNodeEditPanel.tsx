@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Slider } from '@/components/ui/slider'
 import {
   Select,
@@ -19,7 +20,9 @@ import type {
   DiagramNode,
   DiagramNodeType,
   DataSensitivity,
+  StickyNoteTextSize,
 } from '@/features/dfd-editor/types'
+import { useGuestEditor } from '../context/GuestEditorContext'
 import {
   DATA_SENSITIVITY_CONFIG,
   ZONE_COLOR_OPTIONS,
@@ -45,6 +48,7 @@ const nodeTypeConfig: Record<
   systemActor: { label: 'System Actor', icon: Server, color: 'text-slate-600' },
   trustZone: { label: 'Trust Zone', icon: Shield, color: 'text-orange-600' },
   systemScope: { label: 'System Scope', icon: Box, color: 'text-gray-600' },
+  stickyNote: { label: 'Sticky Note', icon: Box, color: 'text-amber-700' },
 }
 
 export const GuestNodeEditPanel = memo(function GuestNodeEditPanel({
@@ -53,6 +57,7 @@ export const GuestNodeEditPanel = memo(function GuestNodeEditPanel({
   renderExtra,
 }: GuestNodeEditPanelProps) {
   const { setNodes, getNodes, getEdges, setEdges } = useReactFlow()
+  const guestEditor = useGuestEditor()
 
   const typeConfig = nodeTypeConfig[node.type as DiagramNodeType]
   const Icon = typeConfig?.icon || Cog
@@ -72,6 +77,23 @@ export const GuestNodeEditPanel = memo(function GuestNodeEditPanel({
 
   const handleDelete = () => {
     const nodes = getNodes() as DiagramNode[]
+    const edges = getEdges()
+
+    // Threats and countermeasures live outside React Flow's node state. Clean
+    // up this node and its connected flows before removing the canvas items.
+    if (guestEditor) {
+      const deletedTargetIds = new Set([
+        node.id,
+        ...edges
+          .filter((edge) => edge.source === node.id || edge.target === node.id)
+          .map((edge) => edge.id),
+      ])
+      for (const targetId of deletedTargetIds) {
+        for (const threat of guestEditor.getThreatsForTarget(targetId)) {
+          guestEditor.removeThreat(threat.id)
+        }
+      }
+    }
 
     // For container nodes (boundaries or process containers), convert children to root nodes
     const hasChildren = nodes.some((n) => n.parentId === node.id)
@@ -98,8 +120,8 @@ export const GuestNodeEditPanel = memo(function GuestNodeEditPanel({
     }
 
     // Remove connected edges
-    setEdges((edges) =>
-      edges.filter((e) => e.source !== node.id && e.target !== node.id)
+    setEdges((currentEdges) =>
+      currentEdges.filter((e) => e.source !== node.id && e.target !== node.id)
     )
 
     onClose()
@@ -121,28 +143,77 @@ export const GuestNodeEditPanel = memo(function GuestNodeEditPanel({
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {/* Common fields */}
-        <div className="space-y-2">
-          <Label htmlFor="node-label">Name</Label>
-          <Input
-            id="node-label"
-            value={node.data.label || ''}
-            onChange={(e) => updateNodeData({ label: e.target.value })}
-            placeholder={node.type === 'trustZone' ? 'e.g., Production VPC, DMZ...' : 'Enter name...'}
-          />
-        </div>
+        {node.type === 'stickyNote' ? (
+          <div className="space-y-2">
+            <Label htmlFor="node-label">Message</Label>
+            <Textarea
+              id="node-label"
+              value={node.data.label || ''}
+              onChange={(e) => updateNodeData({ label: e.target.value })}
+              placeholder="Enter note text..."
+              rows={3}
+            />
+          </div>
+        ) : (
+          <>
+            <div className="space-y-2">
+              <Label htmlFor="node-label">Name</Label>
+              <Input
+                id="node-label"
+                value={node.data.label || ''}
+                onChange={(e) => updateNodeData({ label: e.target.value })}
+                placeholder={node.type === 'trustZone' ? 'e.g., Production VPC, DMZ...' : 'Enter name...'}
+              />
+            </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="node-description">Description</Label>
-          <Textarea
-            id="node-description"
-            value={node.data.description || ''}
-            onChange={(e) => updateNodeData({ description: e.target.value })}
-            placeholder="Enter description..."
-            rows={3}
-          />
-        </div>
+            <div className="space-y-2">
+              <Label htmlFor="node-description">Description</Label>
+              <Textarea
+                id="node-description"
+                value={node.data.description || ''}
+                onChange={(e) => updateNodeData({ description: e.target.value })}
+                placeholder="Enter description..."
+                rows={3}
+              />
+            </div>
+          </>
+        )}
 
         <Separator />
+
+        {node.type === 'stickyNote' && (
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label>Note Color</Label>
+              <Select value={(node.data as { noteColor?: string }).noteColor || 'yellow'} onValueChange={(value) => updateNodeData({ noteColor: value })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="yellow">Yellow</SelectItem>
+                  <SelectItem value="blue">Blue</SelectItem>
+                  <SelectItem value="green">Green</SelectItem>
+                  <SelectItem value="pink">Pink</SelectItem>
+                  <SelectItem value="orange">Orange</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Text Size</Label>
+              <Select
+                value={(node.data as { textSize?: StickyNoteTextSize }).textSize || 'medium'}
+                onValueChange={(value) => updateNodeData({ textSize: value as StickyNoteTextSize })}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="small">Small</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="large">Large</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <label className="flex items-center gap-2 text-sm"><Checkbox checked={!!(node.data as { bold?: boolean }).bold} onCheckedChange={(checked) => updateNodeData({ bold: checked === true })} />Bold text</label>
+            <label className="flex items-center gap-2 text-sm"><Checkbox checked={!!(node.data as { italic?: boolean }).italic} onCheckedChange={(checked) => updateNodeData({ italic: checked === true })} />Italic text</label>
+          </div>
+        )}
 
         {/* Process / Datastore fields */}
         {(node.type === 'process' || node.type === 'datastore') && (

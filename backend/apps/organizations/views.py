@@ -19,27 +19,27 @@ from rest_framework.views import APIView
 from apps.core.permissions import IsSecurityTeam
 
 from .models import (
+    BusinessUnit,
+    MagicLink,
     Organization,
     OrganizationMember,
-    BusinessUnit,
-    Team,
-    TeamMembership,
-    TeamInvitation,
-    MagicLink,
     SharedWithMe,
+    Team,
+    TeamInvitation,
+    TeamMembership,
 )
 from .serializers import (
+    BusinessUnitSerializer,
+    MagicLinkSerializer,
     OrganizationListSerializer,
     OrganizationMemberListSerializer,
     OrganizationMemberSerializer,
     OrganizationSerializer,
-    BusinessUnitSerializer,
-    TeamSerializer,
+    SharedWithMeSerializer,
+    TeamInvitationSerializer,
     TeamListSerializer,
     TeamMembershipSerializer,
-    TeamInvitationSerializer,
-    MagicLinkSerializer,
-    SharedWithMeSerializer,
+    TeamSerializer,
 )
 
 User = get_user_model()
@@ -49,7 +49,11 @@ class OrganizationViewSet(viewsets.ModelViewSet):
     """ViewSet for Organization CRUD operations."""
 
     permission_classes = [IsAuthenticated]
-    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filter_backends = [
+        DjangoFilterBackend,
+        filters.SearchFilter,
+        filters.OrderingFilter,
+    ]
     filterset_fields = ["plan"]
     search_fields = ["name", "domain"]
     ordering_fields = ["name", "created_at"]
@@ -57,14 +61,23 @@ class OrganizationViewSet(viewsets.ModelViewSet):
 
     def get_permissions(self):
         """Apply IsSecurityTeam for write operations and member management."""
-        if self.action in ["create", "update", "partial_update", "destroy", "add_member", "remove_member"]:
+        if self.action in [
+            "create",
+            "update",
+            "partial_update",
+            "destroy",
+            "add_member",
+            "remove_member",
+        ]:
             return [IsAuthenticated(), IsSecurityTeam()]
         return [IsAuthenticated()]
 
     def get_queryset(self):
         """Return organizations the user belongs to."""
         user = self.request.user
-        org_ids = user.organization_memberships.values_list("organization_id", flat=True)
+        org_ids = user.organization_memberships.values_list(
+            "organization_id", flat=True
+        )
         return Organization.objects.filter(id__in=org_ids).prefetch_related("members")
 
     def get_serializer_class(self):
@@ -94,11 +107,13 @@ class OrganizationViewSet(viewsets.ModelViewSet):
     def add_member(self, request, pk=None):
         """Add a member to an organization."""
         org = self.get_object()
-        serializer = OrganizationMemberSerializer(data={
-            "organization": org.id,
-            "user": request.data.get("user"),
-            "role": request.data.get("role", OrganizationMember.Role.MEMBER),
-        })
+        serializer = OrganizationMemberSerializer(
+            data={
+                "organization": org.id,
+                "user": request.data.get("user"),
+                "role": request.data.get("role", OrganizationMember.Role.MEMBER),
+            }
+        )
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -112,7 +127,9 @@ class OrganizationViewSet(viewsets.ModelViewSet):
             member = org.members.get(user_id=user_id)
             if member.is_last_security_team_member():
                 return Response(
-                    {"detail": "At least one organization member must remain on the security team."},
+                    {
+                        "detail": "At least one organization member must remain on the security team."
+                    },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
             TeamMembership.objects.filter(
@@ -138,7 +155,9 @@ class OrganizationMemberViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Return memberships for organizations the user belongs to."""
         user = self.request.user
-        org_ids = user.organization_memberships.values_list("organization_id", flat=True)
+        org_ids = user.organization_memberships.values_list(
+            "organization_id", flat=True
+        )
         return OrganizationMember.objects.filter(
             organization_id__in=org_ids
         ).select_related("organization", "user")
@@ -148,7 +167,9 @@ class OrganizationMemberViewSet(viewsets.ModelViewSet):
         member = self.get_object()
         if member.is_last_security_team_member():
             return Response(
-                {"detail": "At least one organization member must remain on the security team."},
+                {
+                    "detail": "At least one organization member must remain on the security team."
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
         return super().destroy(request, *args, **kwargs)
@@ -159,7 +180,11 @@ class BusinessUnitViewSet(viewsets.ModelViewSet):
 
     serializer_class = BusinessUnitSerializer
     permission_classes = [IsAuthenticated, IsSecurityTeam]
-    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filter_backends = [
+        DjangoFilterBackend,
+        filters.SearchFilter,
+        filters.OrderingFilter,
+    ]
     filterset_fields = ["organization", "parent"]
     search_fields = ["name", "code"]
     ordering_fields = ["name", "created_at"]
@@ -168,10 +193,12 @@ class BusinessUnitViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Return business units for organizations the user belongs to."""
         user = self.request.user
-        org_ids = user.organization_memberships.values_list("organization_id", flat=True)
-        return BusinessUnit.objects.filter(
-            organization_id__in=org_ids
-        ).select_related("organization", "parent")
+        org_ids = user.organization_memberships.values_list(
+            "organization_id", flat=True
+        )
+        return BusinessUnit.objects.filter(organization_id__in=org_ids).select_related(
+            "organization", "parent"
+        )
 
 
 class IsTeamMember(permissions.BasePermission):
@@ -203,7 +230,11 @@ class TeamViewSet(viewsets.ModelViewSet):
     """ViewSet for Team CRUD operations."""
 
     permission_classes = [IsAuthenticated, IsTeamMember]
-    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filter_backends = [
+        DjangoFilterBackend,
+        filters.SearchFilter,
+        filters.OrderingFilter,
+    ]
     filterset_fields = ["organization", "business_unit", "is_default"]
     search_fields = ["name", "code"]
     ordering_fields = ["name", "created_at"]
@@ -215,10 +246,12 @@ class TeamViewSet(viewsets.ModelViewSet):
         Filtering for 'my teams only' can be done via query param.
         """
         user = self.request.user
-        org_ids = user.organization_memberships.values_list("organization_id", flat=True)
-        queryset = Team.objects.filter(
-            organization_id__in=org_ids
-        ).select_related("organization", "business_unit")
+        org_ids = user.organization_memberships.values_list(
+            "organization_id", flat=True
+        )
+        queryset = Team.objects.filter(organization_id__in=org_ids).select_related(
+            "organization", "business_unit"
+        )
 
         # Optional filter: only teams user is a member of
         # Security team members bypass this filter (they manage all teams)
@@ -256,9 +289,7 @@ class TeamViewSet(viewsets.ModelViewSet):
 
     def _can_manage_team(self, team, user):
         """Return True if user is team lead or org security_team."""
-        if team.organization.members.filter(
-            user=user, role="security_team"
-        ).exists():
+        if team.organization.members.filter(user=user, role="security_team").exists():
             return True
         return team.memberships.filter(user=user, role="lead").exists()
 
@@ -269,7 +300,9 @@ class TeamViewSet(viewsets.ModelViewSet):
 
         if not self._can_manage_team(team, request.user):
             return Response(
-                {"detail": "Only team leads and security team members can manage roles."},
+                {
+                    "detail": "Only team leads and security team members can manage roles."
+                },
                 status=status.HTTP_403_FORBIDDEN,
             )
 
@@ -285,7 +318,9 @@ class TeamViewSet(viewsets.ModelViewSet):
         valid_roles = {r[0] for r in TeamMembership.Role.choices}
         if new_role not in valid_roles:
             return Response(
-                {"error": f"Invalid role. Must be one of: {', '.join(sorted(valid_roles))}"},
+                {
+                    "error": f"Invalid role. Must be one of: {', '.join(sorted(valid_roles))}"
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -298,7 +333,9 @@ class TeamViewSet(viewsets.ModelViewSet):
             )
 
         if membership.role == "lead" and new_role != "lead":
-            remaining_leads = team.memberships.filter(role="lead").exclude(user_id=user_id).count()
+            remaining_leads = (
+                team.memberships.filter(role="lead").exclude(user_id=user_id).count()
+            )
             if remaining_leads == 0:
                 return Response(
                     {"error": "Cannot change role: this is the only team lead."},
@@ -327,7 +364,9 @@ class TeamViewSet(viewsets.ModelViewSet):
 
         if not self._can_manage_team(team, request.user):
             return Response(
-                {"detail": "Only team leads and security team members can add members."},
+                {
+                    "detail": "Only team leads and security team members can add members."
+                },
                 status=status.HTTP_403_FORBIDDEN,
             )
 
@@ -347,7 +386,7 @@ class TeamViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        membership, created = TeamMembership.objects.get_or_create(
+        membership, _created = TeamMembership.objects.get_or_create(
             team=team,
             user_id=user_id,
             defaults={"role": role},
@@ -365,7 +404,9 @@ class TeamViewSet(viewsets.ModelViewSet):
 
         if not self._can_manage_team(team, request.user):
             return Response(
-                {"detail": "Only team leads and security team members can invite members."},
+                {
+                    "detail": "Only team leads and security team members can invite members."
+                },
                 status=status.HTTP_403_FORBIDDEN,
             )
 
@@ -387,10 +428,12 @@ class TeamViewSet(viewsets.ModelViewSet):
                 user=existing_user,
                 defaults={"role": role},
             )
-            return Response({
-                "status": "added",
-                "membership": TeamMembershipSerializer(membership).data,
-            })
+            return Response(
+                {
+                    "status": "added",
+                    "membership": TeamMembershipSerializer(membership).data,
+                }
+            )
         except User.DoesNotExist:
             # User doesn't exist - create invitation
             invitation, created = TeamInvitation.objects.update_or_create(
@@ -406,7 +449,11 @@ class TeamViewSet(viewsets.ModelViewSet):
             )
 
             # Send invitation email (prints to console in development)
-            frontend_base = settings.FRONTEND_URL if hasattr(settings, "FRONTEND_URL") else "http://localhost:5173"
+            frontend_base = (
+                settings.FRONTEND_URL
+                if hasattr(settings, "FRONTEND_URL")
+                else "http://localhost:5173"
+            )
             invite_url = f"{frontend_base}/invite/{invitation.token}"
             send_mail(
                 subject=f"You've been invited to join {team.name} on Precogly",
@@ -438,7 +485,9 @@ class TeamViewSet(viewsets.ModelViewSet):
 
         if not self._can_manage_team(team, request.user):
             return Response(
-                {"detail": "Only team leads and security team members can remove members."},
+                {
+                    "detail": "Only team leads and security team members can remove members."
+                },
                 status=status.HTTP_403_FORBIDDEN,
             )
 
@@ -459,7 +508,9 @@ class TeamViewSet(viewsets.ModelViewSet):
             )
 
         if membership.role == "lead":
-            remaining_leads = team.memberships.filter(role="lead").exclude(user_id=user_id).count()
+            remaining_leads = (
+                team.memberships.filter(role="lead").exclude(user_id=user_id).count()
+            )
             if remaining_leads == 0:
                 return Response(
                     {"error": "Cannot remove the only team lead."},
@@ -491,10 +542,12 @@ class TeamViewSet(viewsets.ModelViewSet):
             defaults={"role": TeamMembership.Role.MEMBER},
         )
 
-        return Response({
-            "joined": created,
-            "membership": TeamMembershipSerializer(membership).data,
-        })
+        return Response(
+            {
+                "joined": created,
+                "membership": TeamMembershipSerializer(membership).data,
+            }
+        )
 
 
 class MagicLinkViewSet(viewsets.ModelViewSet):
@@ -573,13 +626,17 @@ class MagicLinkAccessView(APIView):
         # Return read-only threat model data
         from apps.threat_models.serializers import ThreatModelSerializer
 
-        serializer = ThreatModelSerializer(link.threat_model, context={'request': request})
+        serializer = ThreatModelSerializer(
+            link.threat_model, context={"request": request}
+        )
 
         # Get threat analysis data first (stats depend on it)
         threat_analysis = self._get_threat_analysis_data(link.threat_model)
 
         # Compute summary stats from real DB data
-        stats = self._compute_stats_from_threat_analysis(threat_analysis, link.threat_model)
+        stats = self._compute_stats_from_threat_analysis(
+            threat_analysis, link.threat_model
+        )
 
         response_data = {
             "threat_model": serializer.data,
@@ -629,12 +686,16 @@ class MagicLinkAccessView(APIView):
             all_countermeasures.extend(threat.get("countermeasures", []))
         total_countermeasures = len(all_countermeasures)
         verified_count = sum(
-            1 for cm in all_countermeasures if cm.get("status") in ("platform", "verified")
+            1
+            for cm in all_countermeasures
+            if cm.get("status") in ("platform", "verified")
         )
         gaps_count = sum(1 for cm in all_countermeasures if cm.get("status") == "gap")
 
-        # Count components from DFD canvas nodes
-        dfds = threat_model.dfds.all()
+        # Count components from primary DFD canvas nodes
+        from apps.systems.models import OrgsystemComponent
+
+        dfds = threat_model.dfds.filter(is_primary=True)
         processes = 0
         datastores = 0
         human_actors = 0
@@ -659,6 +720,18 @@ class MagicLinkAccessView(APIView):
             if canvas_data.get("edges"):
                 has_data_flows = True
 
+        # Include trust zones from components (DB-level, DFD-independent)
+        db_zone_count = (
+            OrgsystemComponent.objects.filter(
+                threat_model=threat_model,
+                trust_zone__isnull=False,
+            )
+            .values_list("trust_zone_id", flat=True)
+            .distinct()
+            .count()
+        )
+        boundaries = max(boundaries, db_zone_count)
+
         # Compute progress checklist
         workspace_data = threat_model.workspace_data or {}
         system_context = workspace_data.get("systemContext", {})
@@ -677,7 +750,8 @@ class MagicLinkAccessView(APIView):
             "trust_boundaries_identified": boundaries > 0,
             "data_flows_defined": has_data_flows,
             "owners_assigned": manual_progress.get("owners_assigned", False),
-            "threats_linked_components": total_threats > 0 and (processes + datastores) > 0,
+            "threats_linked_components": total_threats > 0
+            and (processes + datastores) > 0,
             "threats_linked_flows": total_threats > 0 and has_data_flows,
             "countermeasures_assigned": total_countermeasures > 0,
         }
@@ -713,12 +787,14 @@ class MagicLinkAccessView(APIView):
             "taxonomy_entry__taxonomy"
         ).all():
             entry = join.taxonomy_entry
-            entries.append({
-                "taxonomy_slug": entry.taxonomy.slug,
-                "taxonomy_name": entry.taxonomy.name,
-                "external_id": entry.external_id,
-                "title": entry.title,
-            })
+            entries.append(
+                {
+                    "taxonomy_slug": entry.taxonomy.slug,
+                    "taxonomy_name": entry.taxonomy.name,
+                    "external_id": entry.external_id,
+                    "title": entry.title,
+                }
+            )
         return entries
 
     def _get_threat_analysis_data(self, threat_model):
@@ -777,26 +853,29 @@ class MagicLinkAccessView(APIView):
         result = []
 
         from django.db.models import Prefetch
+
         from apps.threats.models import CountermeasureThreatLink
 
         # Fetch component threats
         if component_ids:
-            component_threats = ComponentInstanceThreat.objects.filter(
-                component_id__in=component_ids
-            ).select_related(
-                "component", "threat_library"
-            ).prefetch_related(
-                Prefetch(
-                    "countermeasure_links",
-                    queryset=CountermeasureThreatLink.objects.select_related(
-                        "countermeasure",
-                        "countermeasure__countermeasure_library",
-                        "countermeasure__assigned_owner",
-                        "countermeasure__verified_by",
-                    ).prefetch_related(
-                        "countermeasure__instance_standard_mappings__requirement__framework",
-                    ).order_by("display_order"),
-                ),
+            component_threats = (
+                ComponentInstanceThreat.objects.filter(component_id__in=component_ids)
+                .select_related("component", "threat_library")
+                .prefetch_related(
+                    Prefetch(
+                        "countermeasure_links",
+                        queryset=CountermeasureThreatLink.objects.select_related(
+                            "countermeasure",
+                            "countermeasure__countermeasure_library",
+                            "countermeasure__assigned_owner",
+                            "countermeasure__verified_by",
+                        )
+                        .prefetch_related(
+                            "countermeasure__instance_standard_mappings__requirement__framework",
+                        )
+                        .order_by("display_order"),
+                    ),
+                )
             )
 
             for threat in component_threats:
@@ -825,13 +904,17 @@ class MagicLinkAccessView(APIView):
                 threat_description = (
                     threat.threat_library.description if threat.threat_library else None
                 )
-                taxonomy_entries = self._serialize_taxonomy_entries(threat.threat_library)
+                taxonomy_entries = self._serialize_taxonomy_entries(
+                    threat.threat_library
+                )
 
                 threat_data = {
                     "id": threat.id,
                     "type": "component",
                     "component_id": threat.component_id,
-                    "component_name": threat.component.name if threat.component else None,
+                    "component_name": threat.component.name
+                    if threat.component
+                    else None,
                     "node_id": node_info["node_id"] if node_info else None,
                     "dfd_id": node_info["dfd_id"] if node_info else None,
                     "dfd_name": node_info["dfd_name"] if node_info else None,
@@ -849,20 +932,33 @@ class MagicLinkAccessView(APIView):
                         {
                             "id": link.countermeasure.id,
                             "countermeasure_library_id": link.countermeasure.countermeasure_library_id,
-                            "countermeasure_name": link.countermeasure.countermeasure_name or (
-                                link.countermeasure.countermeasure_library.name if link.countermeasure.countermeasure_library else None
+                            "countermeasure_name": link.countermeasure.countermeasure_name
+                            or (
+                                link.countermeasure.countermeasure_library.name
+                                if link.countermeasure.countermeasure_library
+                                else None
                             ),
-                            "countermeasure_description": link.countermeasure.countermeasure_description or (
-                                link.countermeasure.countermeasure_library.description if link.countermeasure.countermeasure_library else None
+                            "countermeasure_description": link.countermeasure.countermeasure_description
+                            or (
+                                link.countermeasure.countermeasure_library.description
+                                if link.countermeasure.countermeasure_library
+                                else None
                             ),
-                            "control_type": link.countermeasure.control_type or (
-                                link.countermeasure.countermeasure_library.control_type if link.countermeasure.countermeasure_library else None
+                            "control_type": link.countermeasure.control_type
+                            or (
+                                link.countermeasure.countermeasure_library.control_type
+                                if link.countermeasure.countermeasure_library
+                                else None
                             ),
                             "status": link.countermeasure.status,
                             "priority": link.countermeasure.priority,
                             "evidence_url": link.countermeasure.evidence_url,
-                            "assigned_owner_email": link.countermeasure.assigned_owner.email if link.countermeasure.assigned_owner else None,
-                            "verified_by_email": link.countermeasure.verified_by.email if link.countermeasure.verified_by else None,
+                            "assigned_owner_email": link.countermeasure.assigned_owner.email
+                            if link.countermeasure.assigned_owner
+                            else None,
+                            "verified_by_email": link.countermeasure.verified_by.email
+                            if link.countermeasure.verified_by
+                            else None,
                             "format_metadata": link.countermeasure.format_metadata,
                             "compliance_standards": [
                                 {
@@ -884,22 +980,24 @@ class MagicLinkAccessView(APIView):
 
         # Fetch data flow threats
         if flow_ids:
-            flow_threats = DataFlowInstanceThreat.objects.filter(
-                data_flow_id__in=flow_ids
-            ).select_related(
-                "data_flow", "threat_library"
-            ).prefetch_related(
-                Prefetch(
-                    "countermeasure_links",
-                    queryset=CountermeasureThreatLink.objects.select_related(
-                        "countermeasure",
-                        "countermeasure__countermeasure_library",
-                        "countermeasure__assigned_owner",
-                        "countermeasure__verified_by",
-                    ).prefetch_related(
-                        "countermeasure__instance_standard_mappings__requirement__framework",
-                    ).order_by("display_order"),
-                ),
+            flow_threats = (
+                DataFlowInstanceThreat.objects.filter(data_flow_id__in=flow_ids)
+                .select_related("data_flow", "threat_library")
+                .prefetch_related(
+                    Prefetch(
+                        "countermeasure_links",
+                        queryset=CountermeasureThreatLink.objects.select_related(
+                            "countermeasure",
+                            "countermeasure__countermeasure_library",
+                            "countermeasure__assigned_owner",
+                            "countermeasure__verified_by",
+                        )
+                        .prefetch_related(
+                            "countermeasure__instance_standard_mappings__requirement__framework",
+                        )
+                        .order_by("display_order"),
+                    ),
+                )
             )
 
             for threat in flow_threats:
@@ -917,7 +1015,9 @@ class MagicLinkAccessView(APIView):
                 threat_description = (
                     threat.threat_library.description if threat.threat_library else None
                 )
-                taxonomy_entries = self._serialize_taxonomy_entries(threat.threat_library)
+                taxonomy_entries = self._serialize_taxonomy_entries(
+                    threat.threat_library
+                )
 
                 threat_data = {
                     "id": threat.id,
@@ -940,20 +1040,33 @@ class MagicLinkAccessView(APIView):
                         {
                             "id": link.countermeasure.id,
                             "countermeasure_library_id": link.countermeasure.countermeasure_library_id,
-                            "countermeasure_name": link.countermeasure.countermeasure_name or (
-                                link.countermeasure.countermeasure_library.name if link.countermeasure.countermeasure_library else None
+                            "countermeasure_name": link.countermeasure.countermeasure_name
+                            or (
+                                link.countermeasure.countermeasure_library.name
+                                if link.countermeasure.countermeasure_library
+                                else None
                             ),
-                            "countermeasure_description": link.countermeasure.countermeasure_description or (
-                                link.countermeasure.countermeasure_library.description if link.countermeasure.countermeasure_library else None
+                            "countermeasure_description": link.countermeasure.countermeasure_description
+                            or (
+                                link.countermeasure.countermeasure_library.description
+                                if link.countermeasure.countermeasure_library
+                                else None
                             ),
-                            "control_type": link.countermeasure.control_type or (
-                                link.countermeasure.countermeasure_library.control_type if link.countermeasure.countermeasure_library else None
+                            "control_type": link.countermeasure.control_type
+                            or (
+                                link.countermeasure.countermeasure_library.control_type
+                                if link.countermeasure.countermeasure_library
+                                else None
                             ),
                             "status": link.countermeasure.status,
                             "priority": link.countermeasure.priority,
                             "evidence_url": link.countermeasure.evidence_url,
-                            "assigned_owner_email": link.countermeasure.assigned_owner.email if link.countermeasure.assigned_owner else None,
-                            "verified_by_email": link.countermeasure.verified_by.email if link.countermeasure.verified_by else None,
+                            "assigned_owner_email": link.countermeasure.assigned_owner.email
+                            if link.countermeasure.assigned_owner
+                            else None,
+                            "verified_by_email": link.countermeasure.verified_by.email
+                            if link.countermeasure.verified_by
+                            else None,
                             "format_metadata": link.countermeasure.format_metadata,
                             "compliance_standards": [
                                 {
@@ -1050,10 +1163,12 @@ class TeamInvitationAcceptView(APIView):
                 status=status.HTTP_410_GONE,
             )
 
-        return Response({
-            "invitation": TeamInvitationSerializer(invitation).data,
-            "requires_signup": not request.user.is_authenticated,
-        })
+        return Response(
+            {
+                "invitation": TeamInvitationSerializer(invitation).data,
+                "requires_signup": not request.user.is_authenticated,
+            }
+        )
 
     def post(self, request, token):
         """Accept the invitation (requires authentication)."""
@@ -1094,10 +1209,12 @@ class TeamInvitationAcceptView(APIView):
             defaults={"role": OrganizationMember.Role.MEMBER},
         )
 
-        return Response({
-            "status": "accepted",
-            "membership": TeamMembershipSerializer(membership).data,
-        })
+        return Response(
+            {
+                "status": "accepted",
+                "membership": TeamMembershipSerializer(membership).data,
+            }
+        )
 
 
 class SharedWithMeViewSet(viewsets.ReadOnlyModelViewSet):
@@ -1114,9 +1231,7 @@ class SharedWithMeViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         """Return threat models shared with the current user."""
-        return SharedWithMe.objects.filter(
-            user=self.request.user
-        ).select_related(
+        return SharedWithMe.objects.filter(user=self.request.user).select_related(
             "threat_model",
             "threat_model__organization",
             "magic_link",

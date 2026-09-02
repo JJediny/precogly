@@ -11,6 +11,7 @@ import { HumanActorNode } from './HumanActorNode'
 import { SystemActorNode } from './SystemActorNode'
 import { TrustZoneNode } from './TrustZoneNode'
 import { SystemScopeNode } from './SystemScopeNode'
+import { StickyNoteNode } from './StickyNoteNode'
 import { DataFlowEdge as DataFlowEdgeComponent } from '../edges/DataFlowEdge'
 import { TrustBoundaryEdge as TrustBoundaryEdgeComponent } from '../edges/TrustBoundaryEdge'
 
@@ -59,6 +60,7 @@ export const canvasNodeTypes = {
   systemActor: withThreatBadge(SystemActorNode),
   trustZone: withThreatBadge(TrustZoneNode),
   systemScope: withThreatBadge(SystemScopeNode),
+  stickyNote: StickyNoteNode,
 } as const
 
 // Edge wrapper that adds a threat count badge

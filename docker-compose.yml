@@ -18,12 +18,20 @@ services:
 
   backend:
     build:
-      context: ./backend
+      # The repository root, because the uv workspace's lock and its `mcp` member
+      # both sit above `backend/`. See the note at the top of backend/Dockerfile.
+      context: .
+      dockerfile: backend/Dockerfile
       target: dev
     container_name: precogly-backend
     volumes:
-      - ./backend:/app
-      - ./libraries:/libraries
+      - ./backend:/app/backend
+      # settings.LIBRARIES_PATH defaults here; the mount keeps pack edits live.
+      - ./libraries:/app/libraries
+      # The MCP server is served from this process (backend/config/mcp_mount.py).
+      # uv installs the workspace member editable, so this mount is what makes an
+      # edit under mcp/ take effect without a rebuild.
+      - ./mcp:/app/mcp
     ports:
       - "8000:8000"
     env_file:

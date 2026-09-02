@@ -7,11 +7,14 @@ from django.core.exceptions import ValidationError
 from django.db import models
 
 from apps.core.models import TimestampedModel
+from apps.core.tenancy import Tenancy
 from apps.organizations.models import Organization
 
 
 class Orgsystem(TimestampedModel):
     """Organizational system being modeled."""
+
+    tenancy = Tenancy.TENANT_OWNED
 
     class Criticality(models.TextChoices):
         LOW = "low", "Low"
@@ -54,6 +57,8 @@ class Orgsystem(TimestampedModel):
 class IntegrationSource(TimestampedModel):
     """External integration source for component discovery."""
 
+    tenancy = Tenancy.TENANT_OWNED
+
     class SourceType(models.TextChoices):
         GITHUB = "github", "GitHub"
         CSPM = "cspm", "CSPM"
@@ -91,6 +96,16 @@ class IntegrationSource(TimestampedModel):
 class TrustZone(TimestampedModel):
     """Trust zone (named security region)."""
 
+    tenancy = Tenancy.TENANT_OWNED
+
+    # A zone used to be reached only in reverse, through `components`, and both hops
+    # to an organization were nullable. #404 read across tenants that way and #406
+    # wrote through it. This column is the boundary now; nothing should re-derive it.
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name="trust_zones",
+    )
     name = models.CharField(max_length=255)
     trust_level = models.IntegerField(default=50, help_text="0-100 scale")
     description = models.TextField(blank=True)
@@ -114,6 +129,16 @@ class TrustZone(TimestampedModel):
 class TrustBoundary(TimestampedModel):
     """Security boundary between two trust zones."""
 
+    tenancy = Tenancy.TENANT_OWNED
+
+    # Carries its own owner rather than reading it off `zone_a`: the two zones are
+    # separate rows and nothing but this column stops a boundary being drawn between
+    # organizations. Lifecycle still comes from the zones, which cascade.
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name="trust_boundaries",
+    )
     zone_a = models.ForeignKey(
         TrustZone,
         on_delete=models.CASCADE,
@@ -158,6 +183,10 @@ class TrustBoundary(TimestampedModel):
 class ComponentLibrary(TimestampedModel):
     """Reusable component templates."""
 
+    # `customization_status` records one tenant's edits to a shipped row, and every
+    # tenant then reads the edited row.
+    tenancy = Tenancy.MIXED
+
     class Category(models.TextChoices):
         PROCESS = "process", "Process"
         DATASTORE = "datastore", "Data Store"
@@ -182,7 +211,11 @@ class ComponentLibrary(TimestampedModel):
         blank=True,
         help_text="Unique identifier within pack, e.g., 'aws-s3'",
     )
-    qualified_slug = models.CharField(
+    # `null=True` is required by `unique_component_qualified_slug` below. Postgres
+    # treats NULLs as distinct under a unique index, so any number of rows may carry no
+    # qualified slug; `blank=True` with `""` would make the second such row collide
+    # with the first. DJ001 cannot see the constraint.
+    qualified_slug = models.CharField(  # noqa: DJ001
         max_length=200,
         null=True,
         blank=True,
@@ -264,9 +297,7 @@ class ComponentLibrary(TimestampedModel):
         current = self.parent
         while current is not None:
             if current.pk in visited:
-                raise ValidationError(
-                    {"parent": "Circular parent reference detected."}
-                )
+                raise ValidationError({"parent": "Circular parent reference detected."})
             visited.add(current.pk)
             current = current.parent
 
@@ -312,6 +343,11 @@ class ComponentLibrary(TimestampedModel):
 
 class OrgsystemComponent(TimestampedModel):
     """Component instance, optionally linked to an orgsystem."""
+
+    # "Optionally linked" is the nullable `orgsystem` that made #227 possible: with it
+    # null the organization is reached through `threat_model` instead, and the queryset
+    # has to cover both.
+    tenancy = Tenancy.TENANT_OWNED
 
     orgsystem = models.ForeignKey(
         Orgsystem,
@@ -367,7 +403,16 @@ class OrgsystemComponent(TimestampedModel):
     format_metadata = models.JSONField(default=dict, blank=True)
 
     # Metadata copied from library on creation (for self-sufficiency if orphaned)
-    category = models.CharField(
+    # TODO: drop `null=True` and migrate existing NULLs to "". `component_type` and
+    # `provider` below are copied from the library the same way and both spell "not
+    # set" as `blank=True` alone, so this field is the odd one of the three.
+    #
+    # The migration changes .tm export output. `adapters/tm_library.py` exports a
+    # component as an actor when `comp.category is None` and its format_metadata
+    # carries an `original_type`; migrating the NULLs stops that branch firing, and
+    # relaxing it to `not comp.category` newly catches rows already holding "".
+    # No test covers either direction.
+    category = models.CharField(  # noqa: DJ001
         max_length=30,
         blank=True,
         null=True,
@@ -393,6 +438,8 @@ class OrgsystemComponent(TimestampedModel):
 
 class DataAsset(TimestampedModel):
     """Data asset with classification."""
+
+    tenancy = Tenancy.TENANT_OWNED
 
     class Sensitivity(models.TextChoices):
         LOW = "low", "Low"
@@ -450,6 +497,8 @@ class DataAsset(TimestampedModel):
 class ComponentDataAsset(TimestampedModel):
     """Association between component and data asset."""
 
+    tenancy = Tenancy.TENANT_OWNED
+
     class DataState(models.TextChoices):
         AT_REST = "at_rest", "At Rest"
         PROCESSED = "processed", "Processed"
@@ -481,6 +530,8 @@ class ComponentDataAsset(TimestampedModel):
 
 class DataFlow(TimestampedModel):
     """Data flow between components."""
+
+    tenancy = Tenancy.TENANT_OWNED
 
     source_component = models.ForeignKey(
         OrgsystemComponent,
@@ -536,6 +587,8 @@ class DataFlow(TimestampedModel):
 
 class DataFlowAsset(TimestampedModel):
     """Data assets transported in a data flow."""
+
+    tenancy = Tenancy.TENANT_OWNED
 
     class ProtectionMethod(models.TextChoices):
         ENCRYPTED = "encrypted", "Encrypted"

@@ -1,0 +1,65 @@
+version: 2
+
+# Version updates only. Security updates are a repository setting and are
+# already on, so an advisory opens a PR whether or not an ecosystem is listed
+# here, and regardless of open-pull-requests-limit. This file adds currency.
+#
+# commit-message repeats per entry because dependabot.yml v2 has no top-level
+# defaults. prefix + include:scope gives "chore(deps): bump x from 1 to 2" —
+# the convention CONTRIBUTING.md sets, and it keeps release-please from
+# treating a dependency bump as a release.
+updates:
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+  # Directory is where pyproject.toml and uv.lock live. That is the repository
+  # root since `backend` and `mcp` became one uv workspace: a workspace has a
+  # single lock, and dependabot follows the lock. Pointing this at /backend
+  # instead finds a pyproject with no lock beside it and updates nothing.
+  - package-ecosystem: "uv"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+  - package-ecosystem: "docker-compose"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+  - package-ecosystem: "docker"
+    directories:
+      - "/frontend"
+      - "/backend/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+  - package-ecosystem: "pre-commit"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore"
+      include: "scope"

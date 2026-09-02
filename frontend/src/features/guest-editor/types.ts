@@ -15,23 +15,32 @@ export interface GuestThreat {
   createdAt: string
 }
 
+export type ControlFunction = 'preventive' | 'detective' | 'corrective' | 'deterrent' | 'recovery' | 'compensating'
+export type ControlNature = 'technical' | 'administrative' | 'physical'
+
 export interface GuestCountermeasure {
   id: string
   threatId: string
   name: string
   description: string
-  controlType: 'preventive' | 'detective' | 'corrective' | 'deterrent' | 'recovery' | 'compensating' | 'procedural'
+  controlFunction: ControlFunction[]
+  controlNature: ControlNature
   createdAt: string
 }
 
-export const GUEST_CONTROL_TYPES = [
-  { value: 'preventive', label: 'Preventive' },
-  { value: 'detective', label: 'Detective' },
-  { value: 'corrective', label: 'Corrective' },
-  { value: 'deterrent', label: 'Deterrent' },
-  { value: 'recovery', label: 'Recovery' },
-  { value: 'compensating', label: 'Compensating' },
-  { value: 'procedural', label: 'Procedural' },
+export const GUEST_CONTROL_FUNCTIONS = [
+  { value: 'preventive' as const, label: 'Preventive', description: 'Stops an attack or fault from occurring. E.g. input validation, access control, encryption at rest.' },
+  { value: 'detective' as const, label: 'Detective', description: 'Identifies an attack or fault during or after the fact. E.g. audit logging, intrusion detection, anomaly alerting.' },
+  { value: 'corrective' as const, label: 'Corrective', description: 'Limits damage and fixes the problem once detected. E.g. applying a patch, revoking a compromised token.' },
+  { value: 'deterrent' as const, label: 'Deterrent', description: 'Discourages a threat actor from attempting an attack. E.g. warning banners, visible monitoring, legal notices.' },
+  { value: 'recovery' as const, label: 'Recovery', description: 'Restores systems or data to normal after an incident. E.g. restoring from backup, failover, disaster-recovery procedures.' },
+  { value: 'compensating' as const, label: 'Compensating', description: 'Alternative control when the primary is not feasible. E.g. enforced manual review where automated gating is unavailable.' },
+] as const
+
+export const GUEST_CONTROL_NATURES = [
+  { value: 'technical' as const, label: 'Technical', description: 'Implemented in software, firmware, or hardware and enforced by the system. E.g. firewall rules, cryptographic controls, ACLs.' },
+  { value: 'administrative' as const, label: 'Administrative / Procedural', description: 'Implemented through policies, processes, and human behaviour. E.g. secure-coding standards, code-review steps, security training.' },
+  { value: 'physical' as const, label: 'Physical', description: 'Implemented through physical-world barriers and safeguards. E.g. locked server rooms, badge readers, tamper-evident seals.' },
 ] as const
 
 // --- System Context types ---

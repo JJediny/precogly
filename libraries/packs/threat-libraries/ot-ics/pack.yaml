@@ -2,7 +2,7 @@ pack:
   schema_version: 1
   slug: ot-ics
   name: OT/ICS Industrial Control Systems
-  version: 1.0.0
+  version: 1.1.0
   pack_type: full
   description: |
     Comprehensive OT/ICS library pack for threat modeling industrial control systems,

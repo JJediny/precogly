@@ -502,7 +502,6 @@ function RiskDetailPanel({
 }) {
   const { data: riskDetail } = useRisk(threatModelId, risk.id)
   const displayRisk = riskDetail ?? risk
-  const recalculate = useRecalculateRisk(threatModelId)
   const updateRisk = useUpdateRisk(threatModelId)
   const { data: scoringMethods } = useScoringMethods()
   const scoringMethodLabel =
@@ -550,9 +549,6 @@ function RiskDetailPanel({
                 ))}
               </SelectContent>
             </Select>
-            <Button variant="ghost" size="sm" onClick={() => recalculate.mutate(risk.id)} disabled={recalculate.isPending}>
-              <RefreshCw className={`h-3 w-3 ${recalculate.isPending ? 'animate-spin' : ''}`} />
-            </Button>
           </div>
         </div>
 
@@ -753,6 +749,8 @@ function TableView({
   onToggleSelect,
   onToggleSelectAll,
   onDeleteRisk,
+  onRecalculateRisk,
+  recalculatingRiskId,
 }: {
   risks: Risk[]
   selectedRiskId: number | null
@@ -761,6 +759,8 @@ function TableView({
   onToggleSelect: (id: number) => void
   onToggleSelectAll: () => void
   onDeleteRisk: (id: number) => void
+  onRecalculateRisk: (id: number) => void
+  recalculatingRiskId: number | null
 }) {
   const allSelected = risks.length > 0 && selectedIds.length === risks.length
 
@@ -783,7 +783,7 @@ function TableView({
             <TableHead className="w-[120px]">Response</TableHead>
             <TableHead className="w-[140px]">Owner</TableHead>
             <TableHead className="w-[80px]">Threats</TableHead>
-            <TableHead className="w-[60px]" />
+            <TableHead className="w-[100px]">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -820,7 +820,20 @@ function TableView({
               <TableCell className="text-center text-sm text-muted-foreground">
                 {risk.threatCount}
               </TableCell>
-              <TableCell>
+              <TableCell className="whitespace-nowrap">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  title="Recalculate residual risk"
+                  aria-label={`Recalculate residual risk for ${risk.name}`}
+                  disabled={recalculatingRiskId === risk.id}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onRecalculateRisk(risk.id)
+                  }}
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 text-muted-foreground ${recalculatingRiskId === risk.id ? 'animate-spin' : ''}`} />
+                </Button>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -854,6 +867,7 @@ export function RiskAnalysisTab({
   const { data: risks, isLoading } = useRisks(threatModelId)
   const { data: scoringMethods } = useScoringMethods()
   const deleteRisk = useDeleteRisk(threatModelId)
+  const recalculateRisk = useRecalculateRisk(threatModelId)
 
   const selectedRisk = risks?.find((r) => r.id === selectedRiskId)
   const activeScoringMethod = scoringMethods?.find((m) => m.key === riskScoringMethod)
@@ -974,6 +988,8 @@ export function RiskAnalysisTab({
                 onToggleSelect={handleToggleSelect}
                 onToggleSelectAll={handleToggleSelectAll}
                 onDeleteRisk={setDeleteRiskId}
+                onRecalculateRisk={(riskId) => recalculateRisk.mutate(riskId)}
+                recalculatingRiskId={recalculateRisk.isPending ? recalculateRisk.variables ?? null : null}
               />
             ) : (
               <KanbanBoard

@@ -6,6 +6,7 @@ import { HumanActorNode } from './nodes/HumanActorNode'
 import { SystemActorNode } from './nodes/SystemActorNode'
 import { TrustZoneNode } from './nodes/TrustZoneNode'
 import { SystemScopeNode } from './nodes/SystemScopeNode'
+import { StickyNoteNode } from './nodes/StickyNoteNode'
 
 // Edge components
 export * from './edges'
@@ -28,6 +29,7 @@ export const nodeTypes = {
   systemActor: SystemActorNode,
   trustZone: TrustZoneNode,
   systemScope: SystemScopeNode,
+  stickyNote: StickyNoteNode,
 } as const
 
 // Edge type registry for React Flow

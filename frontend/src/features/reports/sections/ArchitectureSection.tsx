@@ -72,7 +72,7 @@ export function ArchitectureSection({ architecture }: ArchitectureSectionProps) 
                           </Button>
                         </div>
                         <ReadOnlyDFDViewer
-                          canvasData={dfd.canvasData as { nodes?: unknown[]; edges?: unknown[] }}
+                          canvasData={dfd.canvasData}
                           className="h-[500px] w-full"
                         />
                       </div>

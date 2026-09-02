@@ -10,9 +10,9 @@ Threats carry taxonomy tags from your imported [library packs](library-packs.md)
 
 ![Threats with STRIDE, CAPEC, CWE, and MITRE ATT&CK taxonomy tags](../assets/images/threat-analysis-taxonomy-links.png)
 
-Each countermeasure moves through a lifecycle: **Platform** (provided by infrastructure), **Gap** (not yet addressed), **Planned** (assigned to an owner), **Verified** (confirmed in place), or **Waived** (accepted risk).
+Each countermeasure moves through a lifecycle: **Gap** (not yet addressed), **Planned** (assigned to an owner), **In Progress** (implementation underway), **Implemented** (deployed, not yet verified), **Verified** (confirmed by security team), **Platform** (provided by infrastructure), **Waived** (accepted risk), or **Decommissioned** (no longer active).
 
-![Countermeasure status lifecycle — Platform, Gap, Planned, Verified, Waived](../assets/images/threat-analysis-countermeasures-states.png)
+![Countermeasure status lifecycle](../assets/images/threat-analysis-countermeasures-states.png)
 
 Assign a team member as owner to move a countermeasure from Gap to Planned. Set priority and track progress across your team.
 

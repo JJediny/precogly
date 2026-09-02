@@ -3,17 +3,18 @@
  * Displays a Data Flow Diagram without editing capabilities.
  */
 
-import { ReactFlow, Background, Controls, ReactFlowProvider } from '@xyflow/react'
+import { forwardRef, useImperativeHandle, useRef } from 'react'
+import { ReactFlow, Background, Controls, ReactFlowProvider, useReactFlow, type Edge, type Node } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { nodeTypes, edgeTypes } from '@/features/dfd-editor/components'
 import { DFDNotationProvider } from '@/features/dfd-editor/context/DFDNotationContext'
 import { DEFAULT_NOTATION } from '@/features/dfd-editor/types/notation'
+import { captureDiagramImage } from '@/features/dfd-editor/lib/export-diagram-image'
 
 // Flexible canvas data type that accepts the API response format
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 interface CanvasData {
-  nodes?: any[]
-  edges?: any[]
+  nodes?: unknown[]
+  edges?: unknown[]
   notationStyle?: string
 }
 
@@ -22,13 +23,38 @@ interface ReadOnlyDFDViewerProps {
   className?: string
 }
 
-function DFDViewerContent({ canvasData, className }: ReadOnlyDFDViewerProps) {
-  const nodes = canvasData.nodes ?? []
-  const edges = canvasData.edges ?? []
+export interface ReadOnlyDFDViewerHandle {
+  captureImage: () => Promise<Uint8Array>
+}
+
+const DFDViewerContent = forwardRef<ReadOnlyDFDViewerHandle, ReadOnlyDFDViewerProps>(function DFDViewerContent(
+  { canvasData, className },
+  ref,
+) {
+  const wrapperRef = useRef<HTMLDivElement>(null)
+  const reactFlow = useReactFlow()
+  const nodes = (canvasData.nodes ?? []) as Node[]
+  const edges = (canvasData.edges ?? []) as Edge[]
   const notationStyle = (canvasData.notationStyle as 'dfd3' | 'yourdon') ?? DEFAULT_NOTATION
 
+  useImperativeHandle(ref, () => ({
+    captureImage: () => {
+      if (!wrapperRef.current) {
+        throw new Error('DFD viewer is not mounted')
+      }
+
+      return captureDiagramImage(
+        wrapperRef.current,
+        reactFlow.getNodes(),
+        reactFlow.getViewport,
+        reactFlow.setViewport,
+        reactFlow.getNodesBounds,
+      )
+    },
+  }), [reactFlow])
+
   return (
-    <div className={className}>
+    <div ref={wrapperRef} className={className}>
       <DFDNotationProvider notationStyle={notationStyle}>
         <ReactFlow
           nodes={nodes}
@@ -70,12 +96,12 @@ function DFDViewerContent({ canvasData, className }: ReadOnlyDFDViewerProps) {
       </DFDNotationProvider>
     </div>
   )
-}
+})
 
-export function ReadOnlyDFDViewer(props: ReadOnlyDFDViewerProps) {
+export const ReadOnlyDFDViewer = forwardRef<ReadOnlyDFDViewerHandle, ReadOnlyDFDViewerProps>(function ReadOnlyDFDViewer(props, ref) {
   return (
     <ReactFlowProvider>
-      <DFDViewerContent {...props} />
+      <DFDViewerContent {...props} ref={ref} />
     </ReactFlowProvider>
   )
-}
+})

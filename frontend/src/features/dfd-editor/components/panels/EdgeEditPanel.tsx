@@ -31,6 +31,7 @@ import type {
 } from '../../types'
 import { PROTOCOLS, getZoneColorConfig } from '../../types'
 import { DATA_SENSITIVITY_TAG_CONFIG } from '@/types/domain'
+import { useGuestEditor } from '@/features/guest-editor/context/GuestEditorContext'
 
 const PROTECTION_METHODS = [
   { value: 'none', label: 'None' },
@@ -222,6 +223,7 @@ export const EdgeEditPanel = memo(function EdgeEditPanel({
   renderExtra,
 }: EdgeEditPanelProps) {
   const { setEdges, getNodes } = useReactFlow()
+  const guestEditor = useGuestEditor()
 
   const nodes = getNodes()
   const sourceNode = nodes.find((n) => n.id === edge.source)
@@ -248,6 +250,11 @@ export const EdgeEditPanel = memo(function EdgeEditPanel({
   }
 
   const handleDelete = () => {
+    if (guestEditor) {
+      for (const threat of guestEditor.getThreatsForTarget(edge.id)) {
+        guestEditor.removeThreat(threat.id)
+      }
+    }
     setEdges((edges) => edges.filter((e) => e.id !== edge.id))
     onClose()
   }

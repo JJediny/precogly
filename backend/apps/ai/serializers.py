@@ -16,6 +16,7 @@ contract the settings UI consumes.
 from rest_framework import serializers
 
 from .models import AIProviderConfig
+from .url_policy import URLPolicyError, check_url
 
 
 class AIProviderConfigSerializer(serializers.ModelSerializer):
@@ -55,3 +56,18 @@ class AIProviderConfigSerializer(serializers.ModelSerializer):
 
     def get_has_api_key(self, obj: AIProviderConfig) -> bool:
         return bool(obj.api_key_encrypted)
+
+    def validate_base_url(self, value: str) -> str:
+        """Reject an endpoint this deployment will refuse to fetch anyway.
+
+        This is the error message, not the control. A name resolves again at
+        request time and can answer differently by then, so the provider
+        re-checks before every call; what this adds is a 400 against the field
+        while the operator is still looking at the form, instead of a config
+        that saves cleanly and fails later.
+        """
+        try:
+            check_url(value)
+        except URLPolicyError as err:
+            raise serializers.ValidationError(str(err)) from err
+        return value

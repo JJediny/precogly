@@ -1,0 +1,182 @@
+[project]
+name = "precogly-backend"
+version = "0.4.0"
+description = "Precogly threat modeling backend"
+requires-python = ">=3.12"
+
+# Formerly requirements/base.txt, ranges unchanged. uv.lock holds the exact
+# versions.
+dependencies = [
+    "Django>=5.1,<5.2",
+    "djangorestframework>=3.15,<4.0",
+    "django-filter>=24.0,<25.0",
+    "psycopg[binary]>=3.3.4,<4.0",
+    # Authentication
+    "djangorestframework-simplejwt>=5.3,<6.0",
+    "dj-rest-auth>=7.0,<8.0",
+    "django-allauth>=65.0,<66.0",
+    "requests>=2.32,<3.0",
+    # OAuth 2.1 authorization server, for MCP clients delegating a user's access.
+    "django-oauth-toolkit>=3.4,<4.0",
+    # The MCP endpoint, served from this process (config/mcp_mount.py). a2wsgi
+    # bridges the MCP server's ASGI app into this WSGI application, which is only
+    # affordable because that app is configured for JSON responses and never
+    # streams.
+    "a2wsgi>=1.10,<2.0",
+    # The tools and the reader protocol they call through. Unreleased, so it is
+    # resolved from `../mcp` in this workspace rather than from an index — see
+    # [tool.uv.sources] below.
+    "precogly-mcp",
+    "django-cors-headers>=4.4,<5.0",
+    "django-environ>=0.11,<1.0",
+    # API documentation and case transformation (snake_case <-> camelCase)
+    "drf-spectacular>=0.28,<1.0",
+    "djangorestframework-camel-case>=1.4.2,<2.0",
+    "python-dateutil>=2.9,<3.0",
+    "Pillow>=11.0,<12.0",
+    # Symmetric encryption for per-tenant AI provider API keys at rest (Fernet)
+    "cryptography>=44.0,<45.0",
+]
+
+# requirements/development.txt and requirements/production.txt, which layered on
+# base.txt with `-r`. All three resolve into one uv.lock, so they can no longer
+# disagree about a shared dependency.
+[dependency-groups]
+dev = [
+    "django-debug-toolbar>=4.4,<5.0",
+    "django-extensions>=4.1,<5.0",
+    # Testing
+    "pytest>=9.1.1,<10.0",
+    "pytest-django>=4.8,<5.0",
+    "pytest-cov>=5.0,<6.0",
+    "factory-boy>=3.3,<4.0",
+    # Code quality — keep the ruff pin in step with `rev` in ../.pre-commit-config.yaml
+    "ruff>=0.16.3,<0.17",
+    "pre-commit>=4.0,<5.0",
+    # Type checking
+    "mypy>=1.11,<2.0",
+    "django-stubs>=6.1.0,<7.0",
+    "djangorestframework-stubs>=3.15,<4.0",
+]
+
+prod = [
+    "gunicorn>=23.0,<24.0",
+    # Redis/Celery (for background tasks)
+    "celery>=5.4,<6.0",
+    "django-celery-beat>=2.6,<3.0",
+    "sentry-sdk>=2.0,<3.0",
+    "django-csp>=3.8,<4.0",
+]
+
+[tool.uv]
+# An application, not a distribution — manage.py is the entry point and nothing
+# imports it. Without this uv looks for a build backend and fails.
+package = false
+
+# precogly-mcp is the sibling member of this workspace (../mcp), not a release on
+# an index. mcp/docs/0008 is why it has no release: the server is deployed inside
+# this process and ships on Precogly's release train.
+[tool.uv.sources]
+precogly-mcp = { workspace = true }
+
+# Ruff replaces black (formatting), isort (import ordering), and flake8
+# (linting) with one binary, and adds the flake8-bandit rules
+[tool.ruff]
+target-version = "py312"
+
+# The formatter wraps at 88. The linter tolerates more — see [lint.pycodestyle].
+line-length = 88
+
+# Django generates migrations in its own style and rewrites them on every
+# `makemigrations`, so formatting them means reformatting each new one on the
+# commit that creates it. The `.flake8` this replaces excluded them too.
+# The `**` matters: a single `*` does not cross a path separator, so
+# `*/migrations/*` matches nothing under `apps/<app>/migrations/`.
+extend-exclude = ["**/migrations/**"]
+
+# Needed for exclusions to apply to paths named explicitly on the command line
+# rather than discovered by walking a directory.
+#
+# This only covers runs whose working directory is `backend/`. Ruff resolves
+# exclude patterns against the project root, and when it is invoked from the
+# repository root with a path like `backend/apps/ai/migrations/0001_initial.py`
+# no pattern matches — verified 2026-08-17 against `migrations`,
+# `**/migrations`, `*/migrations/**`, and `**/migrations/**/*`, all of which
+# still linted the file; re-verified 2026-08-26 here in pyproject.toml, on both
+# 0.16.3 and 0.16.4. pre-commit invokes hooks from the repository root, so it
+# carries the same exclusion as a regex in `../.pre-commit-config.yaml`. Both
+# are load-bearing; neither covers the other's case.
+#
+# `--force-exclude` on the command line *does* exclude from the repository root.
+# Only the config setting is scoped this way, so re-checking this needs ruff
+# invoked as pre-commit invokes it, with no such flag.
+force-exclude = true
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes — undefined names, unused imports
+    "I",   # isort — import ordering
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear — patterns that are usually bugs
+    "S",   # flake8-bandit — the security pass
+    "C4",  # flake8-comprehensions
+    "DJ",  # flake8-django
+    "SIM", # flake8-simplify
+    "RUF", # ruff's own rules
+]
+
+ignore = [
+    # RUF012 asks for `ClassVar` on every mutable class attribute. In DRF those
+    # attributes are the framework's declarative surface — `permission_classes`,
+    # `queryset`, `serializer_class`, `filterset_fields` — and it fires 513
+    # times across 48 viewsets, every one of them the documented idiom.
+    "RUF012",
+]
+
+[tool.ruff.lint.pycodestyle]
+# The formatter cannot split a long string, URL, or comment, so setting the
+# E501 limit equal to `line-length` reports lines that nothing can fix.
+# Residual E501 count after `ruff format` at 88:
+#
+#     limit 88 -> 187     limit 100 -> 65     limit 120 -> 16
+#
+# 120 is also what the `.flake8` this replaces used. The formatter still
+# produces 88-column code wherever it can; E501 now only catches the lines it
+# had to leave alone.
+max-line-length = 120
+
+[tool.ruff.lint.isort]
+# Imports are rooted at `backend/`, but pre-commit runs hooks from the
+# repository root, so ruff cannot infer this from the working directory.
+# Without it `from apps.core...` sorts in among the third-party imports.
+known-first-party = ["apps", "config"]
+
+[tool.ruff.lint.per-file-ignores]
+# S101 is bandit's `assert` rule, and it exists because `python -O` strips
+# asserts — a production concern. pytest's whole idiom is the bare assert, and
+# it does not run under -O. The Django-style tests here use `self.assertEqual`
+# and never tripped it; the pytest-style ones added with the MCP work do, 51
+# times in three files.
+#
+# DJ008 wants `__str__` on every model. The models in
+# apps/core/tests/test_tenancy_check.py exist for the length of one test, under
+# `isolate_apps`, and are never rendered anywhere — the rule has nothing to protect
+# there.
+"**/tests/**" = ["DJ008", "S101", "S105", "S106"]
+"**/tests.py" = ["DJ008", "S101", "S105", "S106"]
+
+[tool.pytest.ini_options]
+# Wire pytest-django to the same settings manage.py uses by default. The
+# repo has no dedicated test settings module, and development.py only adds
+# debug tooling on top of base, so it is a safe target for the test run.
+DJANGO_SETTINGS_MODULE = "config.settings.development"
+
+# Most suites live under apps/*/tests/ as test_*.py, but a couple of apps
+# (e.g. packs) keep a bare tests.py. Match both so nothing is silently
+# skipped — the default python_files of just test_*.py misses tests.py.
+python_files = ["test_*.py", "tests.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+testpaths = ["apps"]

@@ -6,7 +6,7 @@ The DFD editor is where you visually model your system — place components, dra
 
 ## Toolbar
 
-![DFD editor toolbar](../assets/images/dfd-component-types.png)
+![DFD editor showing the current toolbar and an AWS serverless diagram](../assets/images/dfd-component-types.png)
 
 | Button | What it does |
 |--------|-------------|
@@ -18,10 +18,32 @@ The DFD editor is where you visually model your system — place components, dra
 | **System Scope** | Visual grouping that defines analysis boundary |
 | **Draw Connection** | Draw data flows between components |
 | **Trust Boundary** | Create security boundaries between trust zones |
+| **DFD3 / Yourdon** | Switch the notation used to render diagram nodes |
 | **Templates** | Insert pre-built diagrams from library packs |
+| **Generate** | Build a DFD from an architecture image with a configured AI provider |
 | **Analyze Threats** | Save and navigate to threat analysis |
+| **Export Image** | Download the current diagram as PNG or SVG |
 
 Click any component button to place it on the canvas. Its editing panel opens on the right.
+
+## Choose a notation
+
+Use the notation selector in the toolbar to switch between **DFD3** and **Yourdon** symbols. Changing the notation changes how nodes are displayed; it does not replace the components or flows in the diagram.
+
+## Generate a DFD from an image
+
+When an [AI provider](../getting-started/configuration.md#ai-threat-suggestions-bring-your-own-model) is configured, click **Generate** to turn an existing architecture diagram into an editable DFD:
+
+1. Enter an application name and optional context.
+2. Upload a JPEG, PNG, or WebP architecture image.
+3. Review the detected components, data flows, trust zones, and optional clarifying questions.
+4. Click **Generate DFD** and review the resulting diagram before using it for threat analysis.
+
+If AI is not configured, **Generate** directs you to the AI provider settings page.
+
+## Export an image
+
+Click **Export Image** to download the current diagram as a PNG or SVG file. This exports a visual copy for reviews and documents; use the threat model export options when you need machine-readable model data.
 
 ## Components
 

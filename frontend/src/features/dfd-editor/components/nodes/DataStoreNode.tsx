@@ -88,6 +88,17 @@ export const DataStoreNode = memo(function DataStoreNode({
                     {technologyDisplayName}
                   </span>
                 )}
+                {data.dataSensitivity && DATA_SENSITIVITY_CONFIG[data.dataSensitivity] && (
+                  <span
+                    className="text-[10px] px-1 rounded truncate mt-0.5"
+                    style={{
+                      backgroundColor: `${DATA_SENSITIVITY_CONFIG[data.dataSensitivity].color}20`,
+                      color: DATA_SENSITIVITY_CONFIG[data.dataSensitivity].color,
+                    }}
+                  >
+                    {DATA_SENSITIVITY_CONFIG[data.dataSensitivity].label}
+                  </span>
+                )}
               </div>
             </div>
           </div>

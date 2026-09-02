@@ -45,11 +45,12 @@ interface GuestEditorContextType {
     threatId: string,
     name: string,
     description: string,
-    controlType: GuestCountermeasure['controlType']
+    controlFunction: GuestCountermeasure['controlFunction'],
+    controlNature: GuestCountermeasure['controlNature']
   ) => void
   updateCountermeasure: (
     countermeasureId: string,
-    updates: Partial<Pick<GuestCountermeasure, 'name' | 'description' | 'controlType'>>
+    updates: Partial<Pick<GuestCountermeasure, 'name' | 'description' | 'controlFunction' | 'controlNature'>>
   ) => void
   removeCountermeasure: (countermeasureId: string) => void
   getCountermeasuresForThreat: (threatId: string) => GuestCountermeasure[]

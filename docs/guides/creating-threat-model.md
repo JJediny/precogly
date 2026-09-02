@@ -272,21 +272,24 @@ Click **Add Custom Countermeasure** to create one manually. You write the name a
 
 Each countermeasure has a status that drives the overall threat status:
 
-| Status   | Meaning                                     | Color  |
-| -------- | ------------------------------------------- | ------ |
-| Gap      | Not implemented                             | Red    |
-| Planned  | Implementation scheduled or in progress     | Yellow |
-| Verified | Confirmed by security team                  | Green  |
-| Platform | Handled at platform/infrastructure level    | Green  |
-| Waived   | Risk accepted with documented justification | Blue   |
+| Status         | Meaning                                     | Color  |
+| -------------- | ------------------------------------------- | ------ |
+| Gap            | Not implemented                             | Red    |
+| Planned        | Implementation scheduled                    | Yellow |
+| In Progress    | Implementation underway                     | Yellow |
+| Implemented    | Deployed, not yet verified                  | Yellow |
+| Verified       | Confirmed by security team                  | Green  |
+| Platform       | Handled at platform/infrastructure level    | Green  |
+| Waived         | Risk accepted with documented justification | Blue   |
+| Decommissioned | No longer active                            | Gray   |
 
 The threat's overall status is derived from its countermeasures:
 
-| Threat status | Condition                                            |
-| ------------- | ---------------------------------------------------- |
-| Exposed       | At least one countermeasure is a gap                 |
-| Addressable   | All countermeasures are planned, waived, or platform |
-| Mitigated     | All countermeasures are verified or platform         |
+| Threat status | Condition                                                          |
+| ------------- | ------------------------------------------------------------------ |
+| Exposed       | No countermeasures applied, or at least one countermeasure is a gap |
+| Addressable   | All countermeasures are planned, in progress, waived, or decommissioned |
+| Mitigated     | All countermeasures are implemented, verified, or platform         |
 
 !!! note
     **Platform** status can only be set by **Security Team** members. This is used for controls managed centrally (e.g., WAF, DDoS protection, SSO). See [Platform Controls](../concepts/platform-controls.md).
@@ -317,19 +320,21 @@ Navigate to the **Risk Analysis** tab to aggregate threats into business-level r
 
 ### Select a scoring method
 
-Choose the risk scoring methodology for this threat model:
+Choose the risk scoring methodology for this threat model. The selector shows planned methods as disabled until their scoring engines are available:
 
-| Method                  | Description                             |
-| ----------------------- | --------------------------------------- |
-| TM Library (5x5 Matrix) | Likelihood x Impact grid                |
-| FAIR                    | Factor Analysis of Information Risk     |
-| OWASP Risk Rating       | OWASP methodology with multiple factors |
-| Mozilla RRA             | Mozilla Rapid Risk Assessment           |
-| Custom                  | Manual score assignment                 |
+| Method                  | Availability | Description                             |
+| ----------------------- | ------------ | --------------------------------------- |
+| TM Library (5x5 Matrix) | Available    | Likelihood x Impact grid                |
+| FAIR                    | Coming soon  | Factor Analysis of Information Risk     |
+| OWASP Risk Rating       | Coming soon  | OWASP methodology with multiple factors |
+| Mozilla RRA             | Coming soon  | Mozilla Rapid Risk Assessment           |
+| Custom                  | Coming soon  | Manual score assignment                 |
 
 ### Create and score risks
 
 Create named risks (e.g., "Customer data breach", "Service availability loss") and link them to specific threats. Precogly computes both inherent and residual risk scores based on threat severity and countermeasure effectiveness.
+
+Use **Table View** to compare scores, owners, responses, and linked-threat counts. Select multiple rows to update their owner or response together. Use **Kanban View** to organize risks by response: Unresponded, Mitigate, Transfer, Accept, or Avoid. Drag a risk between columns to change its response.
 
 ![Risk Analysis](../assets/images/creating-tm-risk-analysis.png)
 

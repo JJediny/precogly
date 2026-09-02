@@ -683,7 +683,7 @@ export function ThreatModelDetail() {
                         <option value="">All</option>
                         {diagrams.map((d) => (
                           <option key={d.id} value={d.id}>
-                            {d.name}
+                            {d.name}{!d.isPrimary ? ' (Reference)' : ''}
                           </option>
                         ))}
                       </select>

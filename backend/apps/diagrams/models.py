@@ -6,10 +6,13 @@ from django.conf import settings
 from django.db import models
 
 from apps.core.models import TimestampedModel
+from apps.core.tenancy import Tenancy
 
 
 class DFDTemplatesLibrary(TimestampedModel):
     """DFD template library."""
+
+    tenancy = Tenancy.MIXED
 
     class DiagramType(models.TextChoices):
         CONTEXT = "context", "Context"
@@ -34,7 +37,11 @@ class DFDTemplatesLibrary(TimestampedModel):
         blank=True,
         help_text="Unique identifier within pack, e.g., 'banking-webapp-l1'",
     )
-    qualified_slug = models.CharField(
+    # `null=True` is required by `unique_dfdtemplate_qualified_slug` below. Postgres
+    # treats NULLs as distinct under a unique index, so any number of rows may carry no
+    # qualified slug; `blank=True` with `""` would make the second such row collide
+    # with the first. DJ001 cannot see the constraint.
+    qualified_slug = models.CharField(  # noqa: DJ001
         max_length=200,
         null=True,
         blank=True,
@@ -96,6 +103,8 @@ class DFDTemplatesLibrary(TimestampedModel):
 
 class DFD(TimestampedModel):
     """Data Flow Diagram."""
+
+    tenancy = Tenancy.TENANT_OWNED
 
     class DiagramType(models.TextChoices):
         CONTEXT = "context", "Context"

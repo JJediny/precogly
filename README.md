@@ -53,7 +53,7 @@ Precogly is designed for enterprise workflows, but smaller organizations can als
 
 ### How is Precogly different?
 
-- **Compliance-aware** — Built-in traceability to DORA, CRA, ASVS, NIST CSF, SOC 2, and more. Every threat and countermeasure maps to compliance requirements.
+- **Compliance-aware** — Built-in traceability to DORA, CRA, ASVS, NIST CSF, SOC 2, and more. Threats can link to security taxonomies, while countermeasures map to framework requirements.
 - **Structured library packs** — Not just brainstorming. Curated packs with components, threats, countermeasures, and taxonomy links (MITRE ATT&CK, CAPEC, CWE, STRIDE) give your team a structured starting point.
 - **AI-agent ready architecture** — A clean REST API with full OpenAPI docs, designed to be a foundation for AI-powered threat modeling assistants.
 - **Pack ecosystem** — Community and official packs for AWS, Azure, GCP, banking, and compliance frameworks. Extend or create your own.
@@ -72,7 +72,7 @@ Precogly is designed for enterprise workflows, but smaller organizations can als
 
 ### Roadmap
 
-See the [v0.3.0 milestone](https://github.com/precogly/precogly/milestone/1) for what's coming next.
+See the [GitHub milestones](https://github.com/precogly/precogly/milestones) for current and upcoming release work.
 
 ### Security
 

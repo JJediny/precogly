@@ -54,9 +54,12 @@ nav:
       - Magic Links: concepts/magic-links.md
   - Guides:
       - Creating a Threat Model: guides/creating-threat-model.md
+      - Guest Editor: guides/guest-editor.md
+      - Pentest Scope: guides/pentests.md
       - Importing & Exporting: guides/importing-exporting.md
       - Compliance Mapping: guides/compliance-mapping.md
       - Report Generation: guides/report-generation.md
+      - AI Features: guides/ai-features.md
   - Recipes:
       - IEC 62443: recipes/iec-62443.md
       - EU Banking: recipes/eu-banking.md

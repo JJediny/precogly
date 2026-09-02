@@ -1,6 +1,6 @@
 # Installation
 
-Precogly runs as a set of Docker containers — a React frontend, a Django backend, and a PostgreSQL database. This guide walks you through getting everything running locally.
+Precogly runs as a set of Docker containers — a React frontend, a Django backend, a PostgreSQL database, and a development-only AI model forwarder. This guide walks you through getting everything running locally.
 
 ## Prerequisites
 
@@ -33,13 +33,14 @@ cd precogly
 docker compose up --build
 ```
 
-This builds and starts three containers:
+This builds and starts four containers:
 
-| Container              | Port  | Description                     |
-| ---------------------- | ----- | ------------------------------- |
-| `precogly-frontend`   | 5173  | React dev server                |
-| `precogly-backend`    | 8000  | Django API server               |
-| `precogly-postgres`   | 5432  | PostgreSQL 16 database          |
+| Container                    | Host port | Description                                      |
+| ---------------------------- | --------- | ------------------------------------------------ |
+| `precogly-frontend`          | 5173      | React development server                         |
+| `precogly-backend`           | 8000      | Django API server                                |
+| `precogly-postgres`          | 5432      | PostgreSQL 16 database                           |
+| `precogly-lmstudio-proxy`    | None      | Development-only forwarder to a host AI provider |
 
 On first launch, the backend automatically:
 

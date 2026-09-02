@@ -1,4 +1,5 @@
-import { memo } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import { useReactFlow } from '@xyflow/react'
 import {
   BaseEdge,
   EdgeLabelRenderer,
@@ -26,6 +27,62 @@ export const DataFlowEdge = memo(function DataFlowEdge({
   selected,
   animated,
 }: EdgeProps<DataFlowEdgeType>) {
+  const { setEdges } = useReactFlow()
+  const [editValue, setEditValue] = useState(data?.label || '')
+  const inputRef = useRef<HTMLTextAreaElement>(null)
+  const originalLabelRef = useRef(data?.label || '')
+  const skipBlurRef = useRef(false)
+  const isEditing = Boolean(data?.isInlineEditing)
+
+  useEffect(() => {
+    if (!isEditing) return
+
+    originalLabelRef.current = data?.label || ''
+    skipBlurRef.current = false
+    setEditValue(originalLabelRef.current)
+    requestAnimationFrame(() => {
+      if (!inputRef.current) return
+      inputRef.current.style.height = 'auto'
+      inputRef.current.style.height = `${inputRef.current.scrollHeight}px`
+      inputRef.current.focus()
+      inputRef.current.select()
+    })
+  }, [isEditing, data?.label])
+
+  const finishEditing = useCallback((commit: boolean) => {
+    setEdges((edges) => edges.map((edge) =>
+      edge.id === id
+        ? {
+            ...edge,
+            data: {
+              ...edge.data,
+              label: commit ? editValue.trim() : originalLabelRef.current,
+              isInlineEditing: false,
+            },
+          }
+        : edge
+    ))
+  }, [editValue, id, setEdges])
+
+  const commitOnBlur = useCallback(() => {
+    if (skipBlurRef.current) {
+      skipBlurRef.current = false
+      return
+    }
+    finishEditing(true)
+  }, [finishEditing])
+
+  const startEditing = useCallback((event: React.MouseEvent) => {
+    event.stopPropagation()
+    setEdges((edges) => edges.map((edge) => {
+      if (edge.type !== 'dataFlow') return edge
+      return {
+        ...edge,
+        data: { ...edge.data, isInlineEditing: edge.id === id },
+      }
+    }))
+  }, [id, setEdges])
+
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
     sourceY,
@@ -54,6 +111,7 @@ export const DataFlowEdge = memo(function DataFlowEdge({
           filter: isNewlyInserted ? 'drop-shadow(0 0 3px rgb(34 197 94))' : undefined,
         }}
         markerEnd={selected ? 'url(#arrow-selected)' : 'url(#arrow)'}
+        onDoubleClick={startEditing}
       />
 
       {/* Edge labels - only show when selected or has important data */}
@@ -71,10 +129,44 @@ export const DataFlowEdge = memo(function DataFlowEdge({
           }}
         >
           {/* Main label */}
-          {data?.label && (
-            <div className="px-2 py-0.5 rounded text-xs bg-white text-gray-950 border border-gray-300 shadow-sm whitespace-nowrap font-medium">
-              {data.label}
-            </div>
+          {(data?.label || selected || isEditing) && (
+            isEditing ? (
+              <textarea
+                ref={inputRef}
+                value={editValue}
+                rows={1}
+                placeholder="Data flow label"
+                onChange={(event) => {
+                  setEditValue(event.target.value)
+                  event.target.style.height = 'auto'
+                  event.target.style.height = `${event.target.scrollHeight}px`
+                }}
+                onKeyDown={(event) => {
+                  event.stopPropagation()
+                  if (event.key === 'Escape') {
+                    event.preventDefault()
+                    skipBlurRef.current = true
+                    finishEditing(false)
+                  } else if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+                    event.preventDefault()
+                    skipBlurRef.current = true
+                    finishEditing(true)
+                  }
+                }}
+                onBlur={commitOnBlur}
+                onClick={(event) => event.stopPropagation()}
+                onMouseDown={(event) => event.stopPropagation()}
+                className="nodrag nopan nowheel min-w-24 resize-none overflow-hidden rounded border border-blue-400 bg-white px-2 py-0.5 text-xs text-gray-950 outline-none"
+              />
+            ) : (
+              <div
+                className="cursor-text rounded border border-gray-300 bg-white px-2 py-0.5 text-center text-xs font-medium text-gray-950 shadow-sm whitespace-pre-line break-words max-w-[240px]"
+                onDoubleClick={startEditing}
+                title="Double-click to edit"
+              >
+                {data?.label || 'Double-click to add label'}
+              </div>
+            )
           )}
 
           {/* Protocol badge */}

@@ -46,14 +46,27 @@ const SEVERITY_COLORS: Record<GuestThreat['severity'], string> = {
   critical: 'bg-red-100 text-red-800',
 }
 
-const CONTROL_TYPE_COLORS: Record<GuestCountermeasure['controlType'], string> = {
+import type { ControlFunction, ControlNature } from '../types'
+
+const CONTROL_FUNCTION_COLORS: Record<ControlFunction, string> = {
   preventive: 'bg-green-100 text-green-800',
   detective: 'bg-blue-100 text-blue-800',
   corrective: 'bg-orange-100 text-orange-800',
   deterrent: 'bg-purple-100 text-purple-800',
   recovery: 'bg-teal-100 text-teal-800',
   compensating: 'bg-amber-100 text-amber-800',
-  procedural: 'bg-gray-100 text-gray-800',
+}
+
+const CONTROL_NATURE_COLORS: Record<ControlNature, string> = {
+  technical: 'bg-sky-100 text-sky-800',
+  administrative: 'bg-rose-100 text-rose-800',
+  physical: 'bg-stone-100 text-stone-800',
+}
+
+const CONTROL_NATURE_LABELS: Record<ControlNature, string> = {
+  technical: 'Technical',
+  administrative: 'Admin/Procedural',
+  physical: 'Physical',
 }
 
 const NODE_TYPE_ICON: Record<string, typeof Cog> = {
@@ -560,16 +573,30 @@ export function GuestThreatAnalysis() {
                           key={countermeasure.id}
                           className="flex items-center justify-between gap-2 p-2 rounded-md border bg-card text-sm group"
                         >
-                          <div className="flex items-center gap-2 min-w-0">
-                            <Badge
-                              variant="secondary"
-                              className={cn(
-                                'shrink-0 text-xs capitalize',
-                                CONTROL_TYPE_COLORS[countermeasure.controlType]
-                              )}
-                            >
-                              {countermeasure.controlType}
-                            </Badge>
+                          <div className="flex items-start gap-2 min-w-0">
+                            <div className="flex flex-wrap gap-1 shrink-0 pt-0.5">
+                              {countermeasure.controlFunction.map((fn) => (
+                                <Badge
+                                  key={fn}
+                                  variant="secondary"
+                                  className={cn(
+                                    'text-xs capitalize',
+                                    CONTROL_FUNCTION_COLORS[fn]
+                                  )}
+                                >
+                                  {fn}
+                                </Badge>
+                              ))}
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  'text-xs',
+                                  CONTROL_NATURE_COLORS[countermeasure.controlNature]
+                                )}
+                              >
+                                {CONTROL_NATURE_LABELS[countermeasure.controlNature]}
+                              </Badge>
+                            </div>
                             <div className="min-w-0">
                               <span className="truncate block">
                                 {countermeasure.name}

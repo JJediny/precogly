@@ -5,11 +5,16 @@ Compliance models - frameworks, standards.
 from django.db import models
 
 from apps.core.models import TimestampedModel
+from apps.core.tenancy import Tenancy
 from apps.threats.models import CountermeasureLibrary
 
 
 class StandardFramework(TimestampedModel):
     """Compliance framework (e.g., PCI-DSS, SOC2, NIST)."""
+
+    # The user-created internal standards are unscoped today: every tenant reads
+    # them — precogly/precogly#405.
+    tenancy = Tenancy.MIXED
 
     slug = models.SlugField(max_length=100, unique=True)
     source_pack = models.ForeignKey(
@@ -43,6 +48,10 @@ class StandardFramework(TimestampedModel):
 class StandardRequirement(TimestampedModel):
     """Requirement within a compliance framework."""
 
+    # No nullable key of its own; a requirement belongs to whoever its framework
+    # belongs to.
+    tenancy = Tenancy.MIXED
+
     framework = models.ForeignKey(
         StandardFramework,
         on_delete=models.CASCADE,
@@ -74,6 +83,10 @@ class StandardRequirement(TimestampedModel):
 class CountermeasureLibraryStandard(models.Model):
     """Association between countermeasure and compliance requirement."""
 
+    # Both ends are library rows, so the mapping ships with the packs rather than
+    # belonging to whoever happens to use it.
+    tenancy = Tenancy.SHARED_REFERENCE
+
     class Sufficiency(models.TextChoices):
         FULL = "full", "Full"
         PARTIAL = "partial", "Partial"
@@ -98,7 +111,9 @@ class CountermeasureLibraryStandard(models.Model):
         unique_together = ["countermeasure_library", "requirement"]
 
     def __str__(self):
-        return f"{self.countermeasure_library} -> {self.requirement} ({self.sufficiency})"
+        return (
+            f"{self.countermeasure_library} -> {self.requirement} ({self.sufficiency})"
+        )
 
 
 class StandardRequirementMapping(models.Model):
@@ -107,6 +122,9 @@ class StandardRequirementMapping(models.Model):
     Example: NIST CSF PR.AC-4 partially covers OWASP A01:2021.
     Used for gap analysis between compliance standards.
     """
+
+    # A statement about two published standards, true for every installation.
+    tenancy = Tenancy.SHARED_REFERENCE
 
     class Sufficiency(models.TextChoices):
         FULL = "full", "Full"

@@ -1,6 +1,6 @@
 # Development Setup
 
-Use this guide when you want to contribute code or documentation to Precogly. The **recommended local workflow is Docker Compose** because it starts the same three services most contributors need: the React frontend, the Django API, and PostgreSQL. You can still run frontend commands such as `npm run dev` directly from `frontend/`, but Docker Compose is the fastest way to get a complete working application with seeded demo data.
+Use this guide when you want to contribute code or documentation to Precogly. The **recommended local workflow is Docker Compose** because it starts the three core services most contributors need—the React frontend, the Django API, and PostgreSQL—plus a development-only AI model forwarder. You can still run frontend commands such as `npm run dev` directly from `frontend/`, but Docker Compose is the fastest way to get a complete working application with seeded demo data.
 
 The development stack mounts the backend source, the frontend `src/` directory, and the shared `libraries/` directory into the containers. That means most frontend and backend code edits are picked up without rebuilding the whole stack. Rebuild when you change dependencies, Dockerfiles, or other files copied into the images during build.
 
@@ -27,6 +27,8 @@ precogly-postgres
 
 The frontend talks to the backend through Vite's development proxy. The browser sends API requests to `/api`, and Vite forwards them to the backend container using the `API_URL` value from `docker-compose.yml`.
 
+The `precogly-lmstudio-proxy` container shares the backend network and forwards `localhost:1234` to an OpenAI-compatible model server on the host. It has no host port of its own and is only part of the development stack.
+
 ## Prerequisites
 
 Install:
@@ -36,7 +38,7 @@ Install:
 | Docker and Docker Compose | Running the application stack |
 | Git | Cloning the repository and preparing pull requests |
 | Node.js 22+ | Optional direct frontend workflow |
-| Python 3.12+ | Optional direct backend workflow |
+| [uv](https://docs.astral.sh/uv/getting-started/installation/) | Optional direct backend workflow, and the docs build. Installs its own Python, so a system 3.12 is not needed |
 
 ## Start the Stack
 
@@ -82,7 +84,7 @@ all.
 
 ## Verify the Stack
 
-Use `docker compose ps` to confirm that all three services are running:
+Use `docker compose ps` to confirm that all four services are running:
 
 ```bash
 docker compose ps
@@ -95,6 +97,7 @@ You should see:
 | `precogly-frontend` | Running on port `5173` |
 | `precogly-backend` | Running on port `8000` |
 | `precogly-postgres` | Healthy on port `5432` |
+| `precogly-lmstudio-proxy` | Running (no host port) |
 
 ## Daily Development Commands
 
@@ -149,10 +152,35 @@ The backend container runs migrations, seeds demo data, and starts Django on por
 ```bash
 docker compose exec backend python manage.py migrate
 docker compose exec backend python manage.py seed
-docker compose exec backend python manage.py test
+docker compose exec backend python -m pytest
 ```
 
-For direct local backend work, create a virtual environment, install development requirements from `backend/requirements/development.txt`, set `DJANGO_SETTINGS_MODULE=config.settings.development`, and run commands from `backend/`.
+For direct local backend work, install [uv](https://docs.astral.sh/uv/getting-started/installation/) and run commands from `backend/`:
+
+```bash
+cd backend
+uv sync                                # creates .venv from uv.lock
+uv run python manage.py migrate
+uv run python -m pytest
+```
+
+`uv sync` installs the base and `dev` dependency groups; add `--group prod` for the deployment runtime (gunicorn, celery, sentry). `uv run` picks up `DJANGO_SETTINGS_MODULE` from `pyproject.toml`'s pytest settings for tests, and `manage.py` defaults to the development module otherwise.
+
+To add or remove a dependency, use `uv add` / `uv remove` rather than editing `pyproject.toml` by hand.
+
+## Documentation Workflow
+
+Preview documentation changes locally:
+
+```bash
+uvx --from 'mkdocs-material>=9.5,<10.0' mkdocs serve
+```
+
+Before opening a documentation pull request, run the strict build to catch broken links, invalid navigation, and Markdown configuration errors:
+
+```bash
+uvx --from 'mkdocs-material>=9.5,<10.0' mkdocs build --strict
+```
 
 ## Troubleshooting
 
@@ -160,8 +188,8 @@ If the frontend loads but API requests fail, check that the backend is healthy w
 
 If ports `5173`, `8000`, or `5432` are already in use, stop the conflicting process or change the port mapping in `docker-compose.yml`. Keep any changed local port mappings out of the pull request unless the project intentionally needs them.
 
-For a local PostgreSQL conflict, prefer setting `POSTGRES_PORT` instead of editing `docker-compose.yml`:
+For a local PostgreSQL conflict, change only the host side of the database port mapping in `docker-compose.yml`, for example from `"5432:5432"` to `"5433:5432"`, then keep that local change out of your pull request:
 
 ```bash
-POSTGRES_PORT=5433 docker compose up --build
+docker compose up --build
 ```

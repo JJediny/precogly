@@ -23,6 +23,8 @@ export interface GuestDiagramOutletContext {
   onEdgesChange: (changes: EdgeChange<DiagramEdge>[]) => void
   undo: () => void
   canUndo: boolean
+  redo: () => void
+  canRedo: boolean
   notationStyle: DFDNotationStyle
   setNotationStyle: (notation: DFDNotationStyle) => void
   exportImageRef: React.MutableRefObject<((format: 'png' | 'svg', options?: ExportImageOptions) => void | Promise<void>) | null>
@@ -152,6 +154,8 @@ export function GuestLayout() {
       onEdgesChange: diagramState.onEdgesChange,
       undo: diagramState.undo,
       canUndo: diagramState.canUndo,
+      redo: diagramState.redo,
+      canRedo: diagramState.canRedo,
       notationStyle,
       setNotationStyle,
       exportImageRef,
@@ -168,6 +172,8 @@ export function GuestLayout() {
       diagramState.onEdgesChange,
       diagramState.undo,
       diagramState.canUndo,
+      diagramState.redo,
+      diagramState.canRedo,
       notationStyle,
       handleCacheImage,
     ]

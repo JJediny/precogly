@@ -11,9 +11,9 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.core.permissions import CanWrite, IsSecurityTeam
-
-from apps.threats.models import ComponentInstanceThreat, ComponentLibraryThreat, build_taxonomy_snapshot
-from apps.threats.serializers import ComponentInstanceThreatSerializer
+from apps.threats.models import (
+    ComponentInstanceThreat,
+)
 
 from .models import (
     ComponentDataAsset,
@@ -46,7 +46,11 @@ class OrgsystemViewSet(viewsets.ModelViewSet):
     """ViewSet for Orgsystem CRUD operations."""
 
     permission_classes = [IsAuthenticated, CanWrite]
-    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filter_backends = [
+        DjangoFilterBackend,
+        filters.SearchFilter,
+        filters.OrderingFilter,
+    ]
     filterset_fields = ["criticality", "lifecycle_state", "organization"]
     search_fields = ["name", "owner"]
     ordering_fields = ["name", "created_at", "criticality"]
@@ -55,7 +59,9 @@ class OrgsystemViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Filter by user's organizations."""
         user = self.request.user
-        org_ids = user.organization_memberships.values_list("organization_id", flat=True)
+        org_ids = user.organization_memberships.values_list(
+            "organization_id", flat=True
+        )
         return Orgsystem.objects.filter(organization_id__in=org_ids).select_related(
             "organization"
         )
@@ -79,17 +85,17 @@ class TrustZoneViewSet(viewsets.ModelViewSet):
         org_ids = self.request.user.organization_memberships.values_list(
             "organization_id", flat=True
         )
+        # The organization filter applies before the threat_model narrowing, not
+        # instead of it. Passing `?threat_model=` used to replace the org join
+        # rather than add to it, which returned any tenant's zones to any
+        # authenticated caller — precogly/precogly#404.
+        queryset = TrustZone.objects.filter(organization_id__in=org_ids)
         threat_model_id = self.request.query_params.get("threat_model")
         if threat_model_id:
-            # Scoped: zones that have components belonging to this threat model
-            return TrustZone.objects.filter(
+            queryset = queryset.filter(
                 components__threat_model_id=threat_model_id
             ).distinct()
-        # Default: zones reachable through any component in user's org
-        return TrustZone.objects.filter(
-            Q(components__orgsystem__organization_id__in=org_ids)
-            | Q(components__threat_model__organization_id__in=org_ids)
-        ).distinct()
+        return queryset
 
 
 class TrustBoundaryViewSet(viewsets.ModelViewSet):
@@ -105,12 +111,7 @@ class TrustBoundaryViewSet(viewsets.ModelViewSet):
         org_ids = self.request.user.organization_memberships.values_list(
             "organization_id", flat=True
         )
-        return TrustBoundary.objects.filter(
-            Q(zone_a__components__orgsystem__organization_id__in=org_ids)
-            | Q(zone_a__components__threat_model__organization_id__in=org_ids)
-            | Q(zone_b__components__orgsystem__organization_id__in=org_ids)
-            | Q(zone_b__components__threat_model__organization_id__in=org_ids)
-        ).distinct()
+        return TrustBoundary.objects.filter(organization_id__in=org_ids)
 
 
 class ComponentLibraryViewSet(viewsets.ModelViewSet):
@@ -130,7 +131,11 @@ class ComponentLibraryViewSet(viewsets.ModelViewSet):
         Returns all components that have been imported into the database.
         Optionally filtered by a threat model's connected packs.
         """
-        qs = ComponentLibrary.objects.all().select_related("source_pack").order_by("name")
+        qs = (
+            ComponentLibrary.objects.all()
+            .select_related("source_pack")
+            .order_by("name")
+        )
         threat_model_id = self.request.query_params.get("threat_model")
         if threat_model_id:
             from apps.threat_models.models import ThreatModelLibraryPack
@@ -139,8 +144,7 @@ class ComponentLibraryViewSet(viewsets.ModelViewSet):
                 threat_model_id=threat_model_id
             ).values_list("library_pack_id", flat=True)
             qs = qs.filter(
-                Q(source_pack_id__in=connected_pack_ids)
-                | Q(source_pack__isnull=True)
+                Q(source_pack_id__in=connected_pack_ids) | Q(source_pack__isnull=True)
             )
         return qs
 
@@ -159,9 +163,14 @@ class OrgsystemComponentViewSet(viewsets.ModelViewSet):
         instance = serializer.save()
         if instance.orgsystem_id is None and instance.threat_model_id:
             from apps.threat_models.models import ThreatModelOrgsystem
-            association = ThreatModelOrgsystem.objects.filter(
-                threat_model_id=instance.threat_model_id
-            ).select_related("orgsystem").first()
+
+            association = (
+                ThreatModelOrgsystem.objects.filter(
+                    threat_model_id=instance.threat_model_id
+                )
+                .select_related("orgsystem")
+                .first()
+            )
             if association:
                 instance.orgsystem = association.orgsystem
                 instance.save(update_fields=["orgsystem"])
@@ -169,7 +178,9 @@ class OrgsystemComponentViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Filter by organizations reachable through orgsystem or threat model."""
         user = self.request.user
-        org_ids = user.organization_memberships.values_list("organization_id", flat=True)
+        org_ids = user.organization_memberships.values_list(
+            "organization_id", flat=True
+        )
         return OrgsystemComponent.objects.filter(
             Q(orgsystem__organization_id__in=org_ids)
             | Q(
@@ -192,9 +203,13 @@ class OrgsystemComponentViewSet(viewsets.ModelViewSet):
         if orgsystem_id:
             # Validate system belongs to user's organization
             user = self.request.user
-            org_ids = list(user.organization_memberships.values_list("organization_id", flat=True))
+            org_ids = list(
+                user.organization_memberships.values_list("organization_id", flat=True)
+            )
             try:
-                system = Orgsystem.objects.get(id=orgsystem_id, organization_id__in=org_ids)
+                system = Orgsystem.objects.get(
+                    id=orgsystem_id, organization_id__in=org_ids
+                )
                 component.orgsystem = system
             except Orgsystem.DoesNotExist:
                 return Response(
@@ -234,12 +249,14 @@ class OrgsystemComponentViewSet(viewsets.ModelViewSet):
 
         total = ComponentInstanceThreat.objects.filter(component=component).count()
 
-        return Response({
-            "created_count": created_count,
-            "existing_count": total - created_count,
-            "total": total,
-            "message": f"Generated {created_count} new threats, {total - created_count} already existed",
-        })
+        return Response(
+            {
+                "created_count": created_count,
+                "existing_count": total - created_count,
+                "total": total,
+                "message": f"Generated {created_count} new threats, {total - created_count} already existed",
+            }
+        )
 
 
 class DataAssetViewSet(viewsets.ModelViewSet):
@@ -255,9 +272,7 @@ class DataAssetViewSet(viewsets.ModelViewSet):
         org_ids = self.request.user.organization_memberships.values_list(
             "organization_id", flat=True
         )
-        return DataAsset.objects.filter(
-            threat_model__organization_id__in=org_ids
-        )
+        return DataAsset.objects.filter(threat_model__organization_id__in=org_ids)
 
 
 class DataFlowViewSet(viewsets.ModelViewSet):
@@ -271,7 +286,9 @@ class DataFlowViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Filter by user's organizations."""
         user = self.request.user
-        org_ids = user.organization_memberships.values_list("organization_id", flat=True)
+        org_ids = user.organization_memberships.values_list(
+            "organization_id", flat=True
+        )
         return DataFlow.objects.filter(
             Q(source_component__orgsystem__organization_id__in=org_ids)
             | Q(
@@ -293,7 +310,9 @@ class IntegrationSourceViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Filter by user's organizations."""
         user = self.request.user
-        org_ids = user.organization_memberships.values_list("organization_id", flat=True)
+        org_ids = user.organization_memberships.values_list(
+            "organization_id", flat=True
+        )
         return IntegrationSource.objects.filter(
             orgsystem__organization_id__in=org_ids
         ).select_related("orgsystem")
@@ -311,7 +330,9 @@ class ComponentDataAssetViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Filter by user's organizations."""
         user = self.request.user
-        org_ids = user.organization_memberships.values_list("organization_id", flat=True)
+        org_ids = user.organization_memberships.values_list(
+            "organization_id", flat=True
+        )
         return ComponentDataAsset.objects.filter(
             Q(component__orgsystem__organization_id__in=org_ids)
             | Q(
@@ -332,13 +353,19 @@ class DataFlowAssetViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Filter by organizations reachable through the data flow's source."""
         user = self.request.user
-        org_ids = user.organization_memberships.values_list("organization_id", flat=True)
-        return DataFlowAsset.objects.filter(
-            Q(data_flow__source_component__orgsystem__organization_id__in=org_ids)
-            | Q(
-                data_flow__source_component__orgsystem__isnull=True,
-                data_flow__source_component__threat_model__organization_id__in=org_ids,
+        org_ids = user.organization_memberships.values_list(
+            "organization_id", flat=True
+        )
+        return (
+            DataFlowAsset.objects.filter(
+                Q(data_flow__source_component__orgsystem__organization_id__in=org_ids)
+                | Q(
+                    data_flow__source_component__orgsystem__isnull=True,
+                    data_flow__source_component__threat_model__organization_id__in=org_ids,
+                )
             )
-        ).select_related(
-            "data_flow__source_component", "data_flow__dest_component", "data_asset"
-        ).order_by("id")
+            .select_related(
+                "data_flow__source_component", "data_flow__dest_component", "data_asset"
+            )
+            .order_by("id")
+        )

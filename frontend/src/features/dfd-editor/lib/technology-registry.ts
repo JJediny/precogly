@@ -33,6 +33,7 @@ export const NODE_TYPE_CATEGORIES: Record<DiagramNodeType, TechnologyCategory[]>
   systemActor: [], // System actors (external systems) typically don't have internal technologies
   trustZone: ['networking'], // Will be further filtered by TRUST_ZONE_TECHNOLOGY_IDS
   systemScope: ['infrastructure', 'networking'],
+  stickyNote: [],
 }
 
 // Technology IDs that are appropriate for Trust Zones
@@ -84,4 +85,3 @@ export const TECHNOLOGY_CATEGORIES: Record<TechnologyCategory, { label: string; 
   security: { label: 'Security Control', color: '#3b82f6' },
   other: { label: 'Other', color: '#475569' },
 }
-

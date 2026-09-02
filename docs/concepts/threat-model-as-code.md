@@ -1,14 +1,24 @@
 # Threat Model as Code
 
-Precogly lets you export any threat model as a structured JSON file so you can store it in version control, diff changes over time, and integrate threat modeling into your development workflow. The same format can be imported back — making Precogly a two-way bridge between your codebase and your threat models.
+Precogly lets you export a threat model as structured JSON so you can store it in
+version control, review changes, and integrate threat modeling into development
+workflows. Precogly supports two import and export formats:
+
+- **TM-Library v1.0** — Precogly's native interchange format and the best choice for
+  moving complete models between Precogly installations.
+- **CycloneDX 2.0 TM-BOM** — an industry-standard format for exchanging threat-model
+  data with the wider CycloneDX ecosystem.
 
 ## Exporting
 
-From any threat model workspace, click **Export** and select **TM-Library (JSON)**. The browser downloads a JSON file named after your threat model (e.g., `my-api-threat-model.json`).
+From any threat model workspace, open **Export** and select either **TM-Library
+(JSON)** or **CycloneDX (JSON)**. TM-Library downloads use a name such as
+`my-api-threat-model.json`; CycloneDX downloads use a name such as
+`my-api-cyclonedx-tm-bom.json`.
 
-![Export dropdown showing the TM-Library JSON option](../assets/images/tm-as-code-export.png)
+![Export dropdown showing TM-Library and CycloneDX JSON options](../assets/images/importing-exporting-export-dropdown.png)
 
-The export includes everything in your threat model:
+TM-Library represents Precogly's complete model most directly, including:
 
 - **Scope** — name, description, business criticality
 - **Trust zones and boundaries** — with access control and authentication configuration
@@ -25,15 +35,21 @@ The export includes everything in your threat model:
 
 ## Importing
 
-On the Threat Models list page, click **Import** and drag in a JSON file (or use the file picker). Precogly creates a new threat model with all entities from the file — components, threats, controls, risks, and their relationships.
+On the Threat Models list page, click **Import**, select **TM-Library** or **CycloneDX**,
+and drag in the corresponding JSON file (or use the file picker). Precogly creates a new
+threat model from the entities and relationships it can map.
 
 ![Import dialog with drag-and-drop dropzone and file picker](../assets/images/tm-as-code-import.png)
 
-After import you'll see a summary of what was created (trust zones, components, threats, controls, etc.) along with any warnings for references that couldn't be resolved.
+After import, review the summary of created trust zones, components, threats, controls,
+and other records. The summary also reports references or values that could not be
+resolved exactly.
 
-## The JSON format
+## TM-Library JSON
 
-Precogly currently uses the [OWASP TM-Library format](https://github.com/OWASP/www-project-threat-model-library) — a structured JSON schema designed for threat model interchange which is expected to evolve into the TM-BOM. Here's the top-level structure:
+The [OWASP Threat Model Library](https://github.com/OWASP/www-project-threat-model-library)
+format is a structured JSON schema for threat-model interchange. Its top-level structure
+looks like this:
 
 ```json
 {
@@ -59,13 +75,34 @@ Precogly currently uses the [OWASP TM-Library format](https://github.com/OWASP/w
 }
 ```
 
-Every entity has a `symbolic_name` (a stable identifier like `comp_api_gateway`) that preserves cross-references across import and export. This means you can export, edit the JSON, and re-import without breaking relationships.
+Entities use a `symbolic_name` (a stable identifier such as `comp_api_gateway`) to
+preserve cross-references across import and export. When editing exported JSON manually,
+keep these identifiers unique and update every reference to a renamed identifier.
+
+## CycloneDX 2.0 TM-BOM
+
+CycloneDX represents a threat model using BOM metadata, components, services,
+vulnerabilities, compositions, and formulation blueprints. Precogly maps its entities to
+those structures and uses BOM references to retain relationships.
+
+Use CycloneDX when another tool consumes or produces CycloneDX BOMs. Use TM-Library when
+the destination is another Precogly installation or when you need Precogly-specific
+entities represented as directly as possible.
+
+See [Importing and Exporting](../guides/importing-exporting.md) for the entity mapping,
+validation rules, filenames, and current format limitations.
 
 ## Round-trip fidelity
 
-Precogly preserves TM-Library metadata through round-trips. Core entities — threat personas, threat sources, severity values, CAPEC/CWE references — are stored as first-class database records and exported from live data. Fields that don't map directly to Precogly's data model (like original risk scoring values or extra persona attributes) are stored in `format_metadata` and written back on export. An imported-then-exported file retains the structure and data of the original.
+Precogly stores core TM-Library entities—such as threat personas, threat sources,
+severity values, and CAPEC/CWE references—as first-class records. Supported source fields
+that do not map directly to the database can be retained in `format_metadata` and emitted
+on export.
 
-Precogly-specific analytical data (STRIDE/ATT&CK taxonomy, severity scoring metadata, compliance mappings, pack lineage) is carried in a standard `extensions` block keyed by `precogly.org/*` namespaces. Other tools safely ignore this block.
+Precogly-specific analytical data can be carried in extension fields, including
+STRIDE/ATT&CK mappings, scoring metadata, compliance mappings, and pack lineage. Always
+review the import summary and compare a re-export when exact fidelity is required,
+especially when exchanging data with a different tool.
 
 ## Version control workflows
 
@@ -78,7 +115,9 @@ Because the export is a single, human-readable JSON file, it fits naturally into
 
 ## Interoperability
 
-The adapter architecture is pluggable — TM-Library is the first format, and additional adapters can be added for other standards.
+Precogly's adapter architecture currently provides TM-Library v1.0 and CycloneDX 2.0
+TM-BOM adapters. Both use the same live threat-model records, while each adapter maps
+those records to the vocabulary and relationship model of its target format.
 
 ## Sample files
 

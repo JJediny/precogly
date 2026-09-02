@@ -45,7 +45,7 @@ export interface ReportArchitecture {
     isPrimary?: boolean
     nodeCount: number
     edgeCount: number
-    canvasData?: { nodes?: unknown[]; edges?: unknown[] }
+    canvasData?: { nodes?: unknown[]; edges?: unknown[]; notationStyle?: string }
   }>
   referenceImages: Array<{
     id: number

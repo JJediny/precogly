@@ -20,6 +20,15 @@ X_FRAME_OPTIONS = "DENY"
 # Stricter CORS in production
 CORS_ALLOW_ALL_ORIGINS = False
 
+# No loopback model endpoints on an exposed deployment. Any org member can save
+# one, and signup adds new users to the primary organization automatically, so on
+# an install with open registration a permissive policy hands anyone who can
+# register a request originating inside the network. A deployment that really does
+# run its model on the same host sets AI_PROVIDER_URL_POLICY back to allow-loopback.
+AI_PROVIDER_URL_POLICY = env.str(  # noqa: F405
+    "AI_PROVIDER_URL_POLICY", default="deny-private"
+)
+
 # Email backend for production
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 

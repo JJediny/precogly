@@ -9,14 +9,16 @@ export function useGuestCountermeasures() {
       threatId: string,
       name: string,
       description: string,
-      controlType: GuestCountermeasure['controlType']
+      controlFunction: GuestCountermeasure['controlFunction'],
+      controlNature: GuestCountermeasure['controlNature']
     ) => {
       const newCountermeasure: GuestCountermeasure = {
         id: crypto.randomUUID(),
         threatId,
         name,
         description,
-        controlType,
+        controlFunction,
+        controlNature,
         createdAt: new Date().toISOString(),
       }
       setCountermeasures((prev) => [...prev, newCountermeasure])
@@ -27,7 +29,7 @@ export function useGuestCountermeasures() {
   const updateCountermeasure = useCallback(
     (
       countermeasureId: string,
-      updates: Partial<Pick<GuestCountermeasure, 'name' | 'description' | 'controlType'>>
+      updates: Partial<Pick<GuestCountermeasure, 'name' | 'description' | 'controlFunction' | 'controlNature'>>
     ) => {
       setCountermeasures((prev) =>
         prev.map((c) => (c.id === countermeasureId ? { ...c, ...updates } : c))

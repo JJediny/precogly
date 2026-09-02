@@ -1,7 +1,7 @@
-import { memo, useCallback, useState } from 'react'
+import { memo, useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { XYPosition } from '@xyflow/react'
-import { User, Server, Cog, Database, Shield, Box, ArrowUp, LayoutTemplate, ShieldAlert, ShieldCheck, ImageDown } from 'lucide-react'
+import { User, Server, Cog, Database, Shield, Box, ArrowUp, LayoutTemplate, ShieldAlert, ShieldCheck, ImageDown, Undo2, Redo2, StickyNote, HelpCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import {
@@ -25,6 +25,13 @@ import type { DFDNotationStyle } from '../types/notation'
 import { useCreateNode } from '../hooks/useCreateNode'
 import { ExportImageDialog } from './ExportImageDialog'
 import type { ExportImageOptions } from '../lib/export-diagram-image'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 
 interface DiagramToolbarProps {
   connectionMode: boolean
@@ -41,6 +48,10 @@ interface DiagramToolbarProps {
   notationStyle?: DFDNotationStyle
   onNotationChange?: (notation: DFDNotationStyle) => void
   onExportImage?: (format: 'png' | 'svg', options?: ExportImageOptions) => void | Promise<void>
+  onUndo?: () => void
+  onRedo?: () => void
+  canUndo?: boolean
+  canRedo?: boolean
   aiAvailable?: boolean
 }
 
@@ -95,6 +106,25 @@ const nodeButtons: ToolbarButtonConfig[] = [
     color: 'text-gray-600 hover:bg-gray-50',
     description: 'Visual grouping for related components (defines analysis scope)',
   },
+  {
+    type: 'stickyNote',
+    label: 'Sticky Note',
+    icon: StickyNote,
+    color: 'text-amber-700 hover:bg-amber-50',
+    description: 'Add a movable note to document design decisions or context',
+  },
+]
+
+const KEYBOARD_SHORTCUTS = [
+  ['Ctrl/Cmd + S', 'Save the diagram'],
+  ['Ctrl/Cmd + Z', 'Undo the last change'],
+  ['Ctrl/Cmd + Shift + Z or Ctrl/Cmd + Y', 'Redo the last undone change'],
+  ['Ctrl/Cmd + A', 'Select all nodes and edges'],
+  ['Ctrl/Cmd + C', 'Copy selected nodes'],
+  ['Ctrl/Cmd + V', 'Paste copied nodes or clipboard text into a selected node'],
+  ['Ctrl/Cmd + D', 'Duplicate selected nodes'],
+  ['Delete / Backspace', 'Delete selected nodes or edges'],
+  ['Escape', 'Deselect and cancel the active interaction'],
 ]
 
 export const DiagramToolbar = memo(function DiagramToolbar({
@@ -113,10 +143,28 @@ export const DiagramToolbar = memo(function DiagramToolbar({
   onNotationChange,
   onExportImage,
   aiAvailable = true,
+  onUndo,
+  onRedo,
+  canUndo = false,
+  canRedo = false,
 }: DiagramToolbarProps) {
   const navigate = useNavigate()
   const { createNode } = useCreateNode(notationStyle)
   const [exportDialogOpen, setExportDialogOpen] = useState(false)
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
+
+  useEffect(() => {
+    const handleShortcutHelp = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return
+      if (event.key === '?') {
+        event.preventDefault()
+        setShortcutsOpen(true)
+      }
+    }
+    window.addEventListener('keydown', handleShortcutHelp)
+    return () => window.removeEventListener('keydown', handleShortcutHelp)
+  }, [])
 
   const handleAddNode = useCallback(
     (type: DiagramNodeType) => {
@@ -187,6 +235,27 @@ export const DiagramToolbar = memo(function DiagramToolbar({
           return [nodeBtn]
         })}
 
+        {(onUndo || onRedo) && (
+          <div className="flex items-center gap-0.5 ml-1">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onUndo} disabled={!canUndo} aria-label="Undo">
+                  <Undo2 className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">Undo (Ctrl/Cmd + Z)</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onRedo} disabled={!canRedo} aria-label="Redo">
+                  <Redo2 className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">Redo (Ctrl/Cmd + Shift + Z)</TooltipContent>
+            </Tooltip>
+          </div>
+        )}
+
         {/* Connection mode toggle */}
         <Tooltip>
           <TooltipTrigger asChild>
@@ -203,7 +272,7 @@ export const DiagramToolbar = memo(function DiagramToolbar({
           <TooltipContent side="bottom">
             <p className="font-medium">Draw Connection</p>
             <p className="text-xs text-muted-foreground">
-              Click and drag from one node to another to create a data flow
+              Click and drag from one node to another to create a data flow. Press ? for shortcuts.
             </p>
           </TooltipContent>
         </Tooltip>
@@ -225,6 +294,24 @@ export const DiagramToolbar = memo(function DiagramToolbar({
             </Select>
           </>
         )}
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              aria-label="Keyboard shortcuts"
+              onClick={() => setShortcutsOpen(true)}
+            >
+              <HelpCircle className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">
+            <p className="font-medium">Keyboard shortcuts (?)</p>
+            <p className="text-xs text-muted-foreground">Show the DFD editor shortcut reference</p>
+          </TooltipContent>
+        </Tooltip>
 
         {!hideTemplates && (
           <>
@@ -337,6 +424,22 @@ export const DiagramToolbar = memo(function DiagramToolbar({
           </div>
         )}
       </div>
+      <Dialog open={shortcutsOpen} onOpenChange={setShortcutsOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Keyboard shortcuts</DialogTitle>
+            <DialogDescription>Shortcuts are active when the canvas is focused and a form field is not being edited.</DialogDescription>
+          </DialogHeader>
+          <div className="divide-y rounded-md border">
+            {KEYBOARD_SHORTCUTS.map(([shortcut, description]) => (
+              <div key={shortcut} className="flex items-center justify-between gap-4 px-3 py-2 text-sm">
+                <kbd className="rounded border bg-muted px-2 py-1 font-mono text-xs whitespace-nowrap">{shortcut}</kbd>
+                <span className="text-right text-muted-foreground">{description}</span>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </TooltipProvider>
   )
 })

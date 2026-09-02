@@ -37,6 +37,30 @@ The values below reflect what `.env.example` provides for local development.
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:5173,http://localhost`          | Origins allowed for API requests |
 | `FRONTEND_URL`         | `http://localhost:5173`                          | Used for password reset links     |
 
+### AI model endpoints
+
+Organizations configure their own model endpoint in the settings UI and Precogly
+fetches that URL from the server, so `AI_PROVIDER_URL_POLICY` bounds where those
+requests can go.
+
+| Value            | Permits                                          | Default in    |
+| ---------------- | ------------------------------------------------ | ------------- |
+| `allow-loopback` | `127.0.0.0/8` and `::1`, plus public addresses    | development   |
+| `deny-private`   | Public addresses only                            | production    |
+
+You do not normally set this. A local install runs a model on the same host, so
+development settings permit loopback; production settings do not, because any
+member can save an endpoint and new signups join the primary organization
+automatically — a permissive policy there would let anyone who can register make
+the server issue requests from inside your network.
+
+Set it explicitly to override, most often `allow-loopback` in production when the
+model really does run beside Precogly.
+
+Neither value permits private or link-local ranges: `169.254.169.254` and
+`10.0.0.0/8` are refused under both. `allow-loopback` reaches a model on the same
+host; it does not reach the cloud metadata service.
+
 ## Settings Modules
 
 Precogly uses split settings for different environments:
@@ -47,6 +71,9 @@ Precogly uses split settings for different environments:
 | `config.settings.production`  | Deployment  | `DEBUG=False`, HTTPS enforced, strict CORS     |
 
 Set the active module via `DJANGO_SETTINGS_MODULE`.
+
+!!! note "Development overrides"
+    The development settings module explicitly enables `DEBUG`, allows all CORS origins, and fixes the accepted host list for the local containers. Changing `DEBUG`, `CORS_ALLOWED_ORIGINS`, or `ALLOWED_HOSTS` in `.env` does not override those development-only values. Use `config.settings.production` and the production Compose configuration when validating deployment settings.
 
 ## Production Deployment
 
@@ -82,11 +109,14 @@ The production settings module automatically configures HTTPS redirect, HSTS, se
 
 ## AI Threat Suggestions (Bring Your Own Model)
 
-Precogly can suggest threats for components using any OpenAI-compatible chat-completions endpoint. The feature is **off by default** — nothing reaches out to a model until you opt in.
+For the complete user-facing guide—including how to set up an AI provider, AI threat suggestions, AI-powered DFD generation, usage reporting, and key handling—see [AI Features](../guides/ai-features.md).
 
-### How It Works
+The operator-wide fallback provider is configured with these environment variables:
 
-When enabled, the AI connects Precogly to a language model that can assist with threat modeling tasks. The current implementation ranks threats from your installed library packs against each component and explains why each applies — future AI features may use different approaches depending on the task.
+When enabled, the AI connects Precogly to a language model for two workflows:
+
+- **Threat suggestions** rank threats from your installed library packs against a component and explain why each applies.
+- **DFD generation** analyzes an uploaded architecture image, lets you review the detected structure and clarifying questions, and creates an editable data flow diagram.
 
 ![AI provider settings in the organization settings page](../assets/images/ai-provider-settings.png)
 
@@ -145,6 +175,14 @@ Organizations can bring their own model by saving an AI provider config through 
 Once a provider is configured, an owl icon appears next to components in the threat analysis workspace. Click it to get AI-generated threat suggestions for that component.
 
 ![The owl icon in the threat analysis workspace triggers AI suggestions](../assets/images/ai-owl-suggestion.png)
+
+### Generating a DFD with AI
+
+Open a DFD and click **Generate** in the editor toolbar. Enter the application context, upload a JPEG, PNG, or WebP architecture diagram, review the detected components and flows, then generate the editable DFD. See the [DFD editor guide](../concepts/dfd-editor.md#generate-a-dfd-from-an-image) for the full workflow.
+
+### Reviewing AI Usage
+
+Organization settings include an **AI Usage** report with total cost, total tokens, average tokens per call, and usage over time. Breakdowns show usage by feature, user, and model/provider. Self-hosted providers can report token activity without a dollar cost.
 
 !!! note
     `AI_SECRET_KEY` is separate from Django's `SECRET_KEY` so it can be rotated independently. Rotating it invalidates any stored per-org API keys, which must then be re-entered.

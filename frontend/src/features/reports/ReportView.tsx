@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Card, CardContent } from '@/components/ui/card'
 import {
@@ -35,6 +35,7 @@ import {
   exportComplianceCSV,
 } from './utils/csvExport'
 import { exportWordDoc } from './utils/wordExport'
+import { ReadOnlyDFDViewer, type ReadOnlyDFDViewerHandle } from '@/components/shared/ReadOnlyDFDViewer'
 
 interface ReportViewProps {
   threatModelId: string
@@ -120,8 +121,34 @@ function renderSection(sectionId: string, depth: string, data: ReportData) {
 
 export function ReportView({ threatModelId }: ReportViewProps) {
   const [reportType, setReportType] = useState<ReportType>('executive')
+  const [isExportingWord, setIsExportingWord] = useState(false)
+  const dfdViewerRefs = useRef<Record<string, ReadOnlyDFDViewerHandle | null>>({})
   const { data, isLoading, error } = useReport(threatModelId)
   const sections = getSectionsForType(reportType)
+
+  const handleWordExport = async (reportData: ReportData) => {
+    setIsExportingWord(true)
+
+    // Give each off-screen React Flow viewer time to mount, measure its nodes,
+    // and apply fitView before capturing the actual rendered diagram.
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+    })
+
+    try {
+      const dfdImages = new Map<string, Uint8Array>()
+      for (const dfd of reportData.architecture.dfds) {
+        const canvasData = dfd.canvasData
+        if (!canvasData?.nodes?.length) continue
+        const viewer = dfdViewerRefs.current[dfd.id]
+        if (!viewer) throw new Error(`DFD viewer is not ready: ${dfd.name}`)
+        dfdImages.set(dfd.id, await viewer.captureImage())
+      }
+      await exportWordDoc(reportData, reportData.metadata.name, dfdImages)
+    } finally {
+      setIsExportingWord(false)
+    }
+  }
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -204,7 +231,7 @@ export function ReportView({ threatModelId }: ReportViewProps) {
                   <DropdownMenuItem
                     onClick={async () => {
                       try {
-                        await exportWordDoc(data, data.metadata.name)
+                        await handleWordExport(data)
                       } catch (err) {
                         toast.error(
                           err instanceof Error
@@ -219,6 +246,30 @@ export function ReportView({ threatModelId }: ReportViewProps) {
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
+
+            {isExportingWord && (
+              <div
+                aria-hidden="true"
+                style={{
+                  position: 'fixed',
+                  left: '-100000px',
+                  top: 0,
+                  width: '1200px',
+                  pointerEvents: 'none',
+                }}
+              >
+                {data.architecture.dfds.map((dfd) => (
+                  dfd.canvasData?.nodes?.length ? (
+                    <ReadOnlyDFDViewer
+                      key={dfd.id}
+                      ref={(viewer) => { dfdViewerRefs.current[dfd.id] = viewer }}
+                      canvasData={dfd.canvasData}
+                      className="h-[700px] w-[1200px]"
+                    />
+                  ) : null
+                ))}
+              </div>
+            )}
 
             {sections.map((section) => (
               <div key={section.id}>

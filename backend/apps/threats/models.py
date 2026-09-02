@@ -8,11 +8,14 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
 from apps.core.models import TimestampedModel
+from apps.core.tenancy import Tenancy
 from apps.systems.models import ComponentLibrary, DataFlow, OrgsystemComponent
 
 
 class ThreatLibrary(TimestampedModel):
     """Threat template/definition."""
+
+    tenancy = Tenancy.MIXED
 
     class CustomizationStatus(models.TextChoices):
         ORIGINAL = "original", "Original (from pack)"
@@ -32,7 +35,11 @@ class ThreatLibrary(TimestampedModel):
         blank=True,
         help_text="Unique identifier within pack, e.g., 'sql-injection'",
     )
-    qualified_slug = models.CharField(
+    # `null=True` is required by `unique_threat_qualified_slug` below. Postgres treats
+    # NULLs as distinct under a unique index, so any number of rows may carry no
+    # qualified slug; `blank=True` with `""` would make the second such row collide
+    # with the first. DJ001 cannot see the constraint.
+    qualified_slug = models.CharField(  # noqa: DJ001
         max_length=200,
         null=True,
         blank=True,
@@ -86,9 +93,10 @@ class ThreatLibrary(TimestampedModel):
         super().save(*args, **kwargs)
 
 
-
 class ExternalTaxonomy(TimestampedModel):
     """External threat classification taxonomy (STRIDE, CAPEC, CWE, etc.)."""
+
+    tenancy = Tenancy.SHARED_REFERENCE
 
     source_pack = models.ForeignKey(
         "packs.LibraryPack",
@@ -114,6 +122,8 @@ class ExternalTaxonomy(TimestampedModel):
 class TaxonomyEntry(TimestampedModel):
     """Single entry within a taxonomy (e.g., STRIDE:tampering, CAPEC:66)."""
 
+    tenancy = Tenancy.SHARED_REFERENCE
+
     taxonomy = models.ForeignKey(
         ExternalTaxonomy,
         on_delete=models.CASCADE,
@@ -138,6 +148,8 @@ class TaxonomyEntry(TimestampedModel):
 class ThreatLibraryTaxonomyEntry(TimestampedModel):
     """M2M join: links a ThreatLibrary to one or more TaxonomyEntry records."""
 
+    tenancy = Tenancy.SHARED_REFERENCE
+
     threat_library = models.ForeignKey(
         ThreatLibrary,
         on_delete=models.CASCADE,
@@ -158,6 +170,8 @@ class ThreatLibraryTaxonomyEntry(TimestampedModel):
 
 class ComponentLibraryThreat(TimestampedModel):
     """Association between component library and threats."""
+
+    tenancy = Tenancy.SHARED_REFERENCE
 
     class AppliesTo(models.TextChoices):
         COMPONENT = "component", "Component"
@@ -191,6 +205,8 @@ class ComponentLibraryThreat(TimestampedModel):
 class CountermeasureLibrary(TimestampedModel):
     """Countermeasure/control template."""
 
+    tenancy = Tenancy.MIXED
+
     class Cost(models.TextChoices):
         LOW = "low", "Low"
         MEDIUM = "medium", "Medium"
@@ -214,7 +230,9 @@ class CountermeasureLibrary(TimestampedModel):
         blank=True,
         help_text="Unique identifier within pack, e.g., 'encryption-at-rest'",
     )
-    qualified_slug = models.CharField(
+    # `null=True` is required by `unique_countermeasure_qualified_slug` below, for the
+    # same reason as `ThreatLibrary.qualified_slug`.
+    qualified_slug = models.CharField(  # noqa: DJ001
         max_length=200,
         null=True,
         blank=True,
@@ -302,6 +320,8 @@ class ThreatAccessLevel(models.TextChoices):
 
 class ComponentInstanceThreat(TimestampedModel):
     """Threat instance for a specific component."""
+
+    tenancy = Tenancy.TENANT_OWNED
 
     class Severity(models.TextChoices):
         LOW = "low", "Low"
@@ -407,6 +427,8 @@ class ComponentInstanceThreat(TimestampedModel):
 class DataFlowInstanceThreat(TimestampedModel):
     """Threat instance for a specific data flow."""
 
+    tenancy = Tenancy.TENANT_OWNED
+
     class Severity(models.TextChoices):
         LOW = "low", "Low"
         MEDIUM = "medium", "Medium"
@@ -511,6 +533,8 @@ class DataFlowInstanceThreat(TimestampedModel):
 class InstanceCountermeasure(TimestampedModel):
     """Unified countermeasure instance scoped to a threat model, linked to threats via junction table."""
 
+    tenancy = Tenancy.TENANT_OWNED
+
     class Status(models.TextChoices):
         GAP = "gap", "Gap"
         PLANNED = "planned", "Planned"
@@ -574,7 +598,9 @@ class InstanceCountermeasure(TimestampedModel):
         help_text="User-assessed control effectiveness (0.0-1.0). Null = not yet assessed.",
     )
     priority = models.CharField(max_length=10, default="none", blank=True)
-    due_date = models.DateField(null=True, blank=True, help_text="Target completion date")
+    due_date = models.DateField(
+        null=True, blank=True, help_text="Target completion date"
+    )
     external_ticket_url = models.URLField(
         blank=True, help_text="Link to Jira/GitHub/etc. ticket"
     )
@@ -594,6 +620,8 @@ class InstanceCountermeasure(TimestampedModel):
 
 class CountermeasureThreatLink(TimestampedModel):
     """Polymorphic junction table linking a countermeasure to component and/or flow threats."""
+
+    tenancy = Tenancy.TENANT_OWNED
 
     countermeasure = models.ForeignKey(
         InstanceCountermeasure,
@@ -646,6 +674,13 @@ class CountermeasureThreatLink(TimestampedModel):
 class VerificationTest(TimestampedModel):
     """Verification test for countermeasures."""
 
+    # Tenant-owned despite reading like a template: `last_run_at`, `passed`, and
+    # `evidence` are one organization's test result, not a definition. Like TrustZone it
+    # carries no foreign key saying so — it is reached only through
+    # `InstanceCountermeasureTest` — and `/api/verification-tests/` serves it. Suspected
+    # to leak the same way #404 does; unverified.
+    tenancy = Tenancy.TENANT_OWNED
+
     class Method(models.TextChoices):
         PENTEST = "pentest", "Penetration Test"
         AUTO = "auto", "Automated Scan"
@@ -666,6 +701,8 @@ class VerificationTest(TimestampedModel):
 
 class InstanceCountermeasureTest(TimestampedModel):
     """Association between countermeasure and verification test."""
+
+    tenancy = Tenancy.TENANT_OWNED
 
     countermeasure = models.ForeignKey(
         InstanceCountermeasure,
@@ -689,6 +726,8 @@ class InstanceCountermeasureTest(TimestampedModel):
 
 class CountermeasureComment(TimestampedModel):
     """Comment/history log entry for a countermeasure instance."""
+
+    tenancy = Tenancy.TENANT_OWNED
 
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -715,6 +754,8 @@ class CountermeasureComment(TimestampedModel):
 
 class PentestFinding(TimestampedModel):
     """Pentest finding for reconciliation."""
+
+    tenancy = Tenancy.TENANT_OWNED
 
     class ReconciliationStatus(models.TextChoices):
         MATCHED = "matched", "Matched"
@@ -761,6 +802,10 @@ class InstanceCountermeasureStandard(TimestampedModel):
     Allows overriding library-level compliance mappings for specific countermeasure instances.
     Instance mappings take precedence over library mappings for the same requirement.
     """
+
+    # The override belongs to whoever made it, even though both things it names —
+    # a library countermeasure and a published requirement — are shared.
+    tenancy = Tenancy.TENANT_OWNED
 
     class Sufficiency(models.TextChoices):
         FULL = "full", "Full"
@@ -817,6 +862,8 @@ def build_taxonomy_snapshot(threat_library):
 class Risk(TimestampedModel):
     """Business-level risk that aggregates multiple threat instances."""
 
+    tenancy = Tenancy.TENANT_OWNED
+
     class Level(models.TextChoices):
         LOW = "low", "Low"
         MEDIUM = "medium", "Medium"
@@ -851,7 +898,15 @@ class Risk(TimestampedModel):
         choices=Level.choices,
         blank=True,
     )
-    response = models.CharField(
+    # TODO: drop `null=True` and migrate existing NULLs to "". `residual_level` two
+    # fields up is the same shape and spells "not set" as `blank=True` alone, so this
+    # model carries two spellings for it.
+    #
+    # Backend and frontend have to land together. `RiskViewSet.bulk_update` writes
+    # NULL deliberately — `request.data["response"] or None` — and the risk board
+    # filters with `r.response === col.response` against a column whose key is `null`,
+    # so a stored "" would drop every cleared risk off the board.
+    response = models.CharField(  # noqa: DJ001
         max_length=20,
         choices=Response.choices,
         null=True,
@@ -907,6 +962,8 @@ class Risk(TimestampedModel):
 class ThreatPersona(TimestampedModel):
     """Threat persona scoped to a specific threat model."""
 
+    tenancy = Tenancy.TENANT_OWNED
+
     threat_model = models.ForeignKey(
         "threat_models.ThreatModel",
         on_delete=models.CASCADE,
@@ -945,6 +1002,8 @@ class ThreatPersona(TimestampedModel):
 
 class ThreatPersonaLink(TimestampedModel):
     """Links a ThreatPersona to a threat instance (dual-FK pattern)."""
+
+    tenancy = Tenancy.TENANT_OWNED
 
     persona = models.ForeignKey(
         ThreatPersona,
@@ -995,6 +1054,8 @@ class ThreatPersonaLink(TimestampedModel):
 class ThreatSource(TimestampedModel):
     """Global reference table for threat sources (e.g., NIST SP 800-30r1)."""
 
+    tenancy = Tenancy.SHARED_REFERENCE
+
     slug = models.SlugField(max_length=50, unique=True)
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True, default="")
@@ -1008,6 +1069,9 @@ class ThreatSource(TimestampedModel):
 
 class ThreatSourceLink(TimestampedModel):
     """Links a ThreatSource to a threat instance (dual-FK pattern)."""
+
+    # The source is shared; which threat instance cites it is not.
+    tenancy = Tenancy.TENANT_OWNED
 
     source = models.ForeignKey(
         ThreatSource,
@@ -1057,6 +1121,8 @@ class ThreatSourceLink(TimestampedModel):
 
 class RiskResponse(TimestampedModel):
     """Structured risk response (CycloneDX 2.0 TM-BOM)."""
+
+    tenancy = Tenancy.TENANT_OWNED
 
     class Strategy(models.TextChoices):
         AVOID = "avoid", "Avoid"
@@ -1108,6 +1174,8 @@ class RiskResponse(TimestampedModel):
 
 class RiskThreat(TimestampedModel):
     """Junction table linking a Risk to threat instances."""
+
+    tenancy = Tenancy.TENANT_OWNED
 
     risk = models.ForeignKey(
         Risk,

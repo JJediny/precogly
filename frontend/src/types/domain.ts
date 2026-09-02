@@ -282,7 +282,7 @@ export type ThreatFramework = 'stride' | 'linddun' | 'cia'
 // Node types for DFD
 // humanActor = external human entity (customer, admin, attacker)
 // systemActor = external non-human system (third-party API, partner system)
-export type DiagramNodeType = 'process' | 'datastore' | 'humanActor' | 'systemActor' | 'trustZone' | 'systemScope'
+export type DiagramNodeType = 'process' | 'datastore' | 'humanActor' | 'systemActor' | 'trustZone' | 'systemScope' | 'stickyNote'
 
 // Compliance/Security Standards
 export type SecurityStandard =

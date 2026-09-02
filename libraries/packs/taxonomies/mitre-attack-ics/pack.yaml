@@ -4,7 +4,7 @@ pack:
   name: MITRE ATT&CK for ICS
   description: Curated subset of MITRE ATT&CK for Industrial Control Systems techniques covering adversary behaviors targeting
     SCADA, DCS, PLC, and other industrial systems.
-  version: 1.0.0
+  version: 2.0.0
   pack_type: taxonomy
   author: Precogly
   tags:

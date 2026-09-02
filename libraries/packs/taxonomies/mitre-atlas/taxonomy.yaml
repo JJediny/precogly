@@ -588,10 +588,6 @@ taxonomies:
         title: "Use Alternate Authentication Material: Application Access Token"
         description: "Adversaries may use stolen application access tokens to bypass the typical authentication process and access restricted accounts, information, or services on remote systems. These tokens are typically stolen from users or services and used in lieu of login credentials."
         reference_url: "https://atlas.mitre.org/techniques/AML.T0091.000"
-      - external_id: AML.T0091.001
-        title: "Use Alternate Authentication Material: Web Session Cookie"
-        description: "Adversaries may use stolen web session cookies to authenticate to AI-enabled applications and supporting services as another user. This technique may bypass some multi-factor authentication controls because the session represented by the cookie has already been authenticated."
-        reference_url: "https://atlas.mitre.org/techniques/AML.T0091.001"
       - external_id: AML.T0092
         title: Manipulate User LLM Chat History
         description: "Adversaries may manipulate a user's large language model (LLM) chat history to cover the tracks of their malicious behavior. They may hide persistent changes they have made to the LLM's behavior, or obscure their attempts at discovering private information about the user."
@@ -688,11 +684,3 @@ taxonomies:
         title: "Machine Compromise: AI Artifacts"
         description: "Adversaries may achieve full system compromise by introducing malicious AI artifacts, such as models or data, that contain embedded malware or other malicious commands. AI artifacts are often stored in model registries or data stores and may affect many systems that pull these resources."
         reference_url: "https://atlas.mitre.org/techniques/AML.T0112.001"
-      - external_id: AML.T0113
-        title: Steal Web Session Cookie
-        description: "Adversaries may steal web application or service session cookies used to authenticate users to AI-enabled systems, AI services, or supporting enterprise applications. Web applications often use session cookies as authentication tokens after a user has signed in."
-        reference_url: "https://atlas.mitre.org/techniques/AML.T0113"
-      - external_id: AML.T0114
-        title: AI Service Web Interface
-        description: "Adversaries may communicate with compromised systems by abusing the web interface of an AI service as an intermediary command-and-control relay. Instead of connecting directly to attacker-controlled infrastructure or using an AI provider's API, malware may open or automate a browser, embedded browser, or WebView component to interact with a public AI assistant."
-        reference_url: "https://atlas.mitre.org/techniques/AML.T0114"

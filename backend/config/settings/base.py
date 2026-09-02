@@ -2,8 +2,10 @@
 Base Django settings for Precogly backend.
 """
 
-import environ
+from datetime import timedelta
 from pathlib import Path
+
+import environ
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -53,6 +55,7 @@ THIRD_PARTY_APPS = [
     "allauth.socialaccount",
     "dj_rest_auth",
     "dj_rest_auth.registration",
+    "oauth2_provider",
 ]
 
 LOCAL_APPS = [
@@ -149,9 +152,23 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+# The two server-rendered OAuth pages are the only thing here that needs static
+# files; everything else a user sees is served by Vite. `css/auth.css` is built
+# from the frontend's own tokens by `npm run build:auth-css` and committed,
+# because this image has no Node in it.
+STATICFILES_DIRS = [BASE_DIR / "static"]
 
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
+
+
+# Library packs
+#
+# The directory holding the pack sources, containing `packs/`. It is one setting
+# rather than a search of paths relative to BASE_DIR, because the container mounts
+# it somewhere BASE_DIR cannot reach: a guess that misses leaves every library
+# catalog empty, which reads as an empty database rather than as a missing mount.
+LIBRARIES_PATH = Path(env("LIBRARIES_PATH", default=str(BASE_DIR.parent / "libraries")))
 
 
 # Default primary key field type
@@ -167,6 +184,12 @@ SITE_ID = 1
 # Django REST Framework
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
+        # Order matters here. simplejwt's `get_validated_token`
+        # raises InvalidToken on anything that is not one of its own JWTs, and DRF
+        # does not catch it, so a class listed before this one ends the chain for
+        # every OAuth access token. django-oauth-toolkit's returns None when the
+        # token is not its own, so a JWT falls through it to simplejwt below.
+        "oauth2_provider.contrib.rest_framework.OAuth2Authentication",
         "rest_framework_simplejwt.authentication.JWTAuthentication",
         # SessionAuthentication removed - it causes CSRF errors when stale sessionid
         # cookies are present during login. Since we use JWT, sessions aren't needed.
@@ -197,13 +220,18 @@ REST_FRAMEWORK = {
 # CamelCase parser settings - ignore auth fields used by dj-rest-auth
 JSON_CAMEL_CASE = {
     "JSON_UNDERSCOREIZE": {
-        "ignore_keys": ("password1", "password2", "new_password1", "new_password2", "email"),
+        "ignore_keys": (
+            "password1",
+            "password2",
+            "new_password1",
+            "new_password2",
+            "email",
+        ),
     },
 }
 
 
 # JWT Settings
-from datetime import timedelta
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
@@ -238,6 +266,139 @@ AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
     # allauth specific authentication methods, such as login by email
     "allauth.account.auth_backends.AuthenticationBackend",
+]
+
+# Where django-oauth-toolkit's authorize view sends an unauthenticated user.
+# Django's default is "/accounts/login/", which resolved to nothing here until
+# allauth's URLs were routed in config.urls — the authorize endpoint answered a
+# 404 rather than a login page.
+LOGIN_URL = "/accounts/login/"
+
+
+# OAuth 2.1 authorization server. Precogly issues the tokens; the MCP server is
+# a resource server that validates them and holds no credential of its own.
+OAUTH2_PROVIDER = {
+    # These strings are the consent screen. A user deciding whether to connect
+    # an agent reads them and nothing else, so they name what is at stake rather
+    # than restating the verb.
+    "SCOPES": {
+        "read": "Read your threat models, diagrams and installed libraries",
+        "write": "Create and change threat models on your behalf",
+    },
+    # The default is ["__all__"], which would hand every new client write access
+    # without anyone choosing it. A client that wants to write has to ask.
+    "DEFAULT_SCOPES": ["read"],
+    # RFC 8252 exempts loopback redirects from port matching, because a native
+    # client binds whatever ephemeral port is free. django-oauth-toolkit applies
+    # the exemption to 127.0.0.1 and ::1 but withholds it from the hostname
+    # "localhost", which §8.3 marks NOT RECOMMENDED. Clients spell it "localhost"
+    # anyway, so without this the first authorization succeeds and every later
+    # one fails on a redirect_uri mismatch that the request does not explain.
+    "ALLOW_LOCALHOST_LOOPBACK": True,
+    # Dynamic client registration (RFC 7591). Off by default, and the metadata
+    # document gates `registration_endpoint` on this rather than on the URL
+    # resolving — so with it off a client discovers a server it cannot register
+    # with, and stops there.
+    "DCR_ENABLED": True,
+    # RFC 9700 (OAuth 2.0 Security Best Current Practice) hardening. Each of
+    # these is enforced in `oauth2_validators`, not merely reflected in the
+    # metadata document: without them this server advertises and accepts the
+    # implicit and password grants and the "plain" PKCE challenge method, none
+    # of which any client here has a reason to use.
+    "COMPLIANT_BCP_RFC9700_IMPLICIT_GRANT": True,
+    "COMPLIANT_BCP_RFC9700_PASSWORD_GRANT": True,
+    "COMPLIANT_BCP_RFC9700_PKCE_METHOD": True,
+    # RFC 9700 §4.3.2 / RFC 6750 §5.3: an access token in the query string lands in
+    # browser history, proxy logs and Referer headers. Nothing here sends one that
+    # way — `/mcp` reads the header only, and the gate this sets
+    # (`oauth2_backends.py:266`) fires solely on `access_token` in `request.GET` — so
+    # this refuses a transport no client of ours uses.
+    "COMPLIANT_BCP_RFC9700_ACCESS_TOKEN_TRANSPORT": True,
+    # RFC 9207: name this server in the authorization response, so a client that
+    # talks to several cannot be tricked into sending a code to the wrong one. Depends
+    # on OIDC_ISS_ENDPOINT being pinned below — django-oauth-toolkit otherwise derives
+    # `iss` from the prefixed metadata mount while the client read the root one, and
+    # RFC 8414 compares issuers as exact strings, so a strict client rejects its own
+    # authorization response.
+    "COMPLIANT_BCP_RFC9700_AUTHZ_RESPONSE_ISS": True,
+    # RFC 9700 §4.14.2 defines refresh token rotation as invalidating the presented
+    # token *and* revoking the active one once a replay proves the token is held by
+    # two parties: "the authorization server cannot determine which party submitted
+    # the invalid refresh token, but it will revoke the active refresh token."
+    # Rotation alone does the first half, so a stolen token outlives the client it
+    # was stolen from — the thief keeps rotating while the victim silently
+    # re-authorizes.
+    #
+    # The grace period is not optional alongside it. At 0 every replay is an attack,
+    # including a client retrying after its connection dropped once the server had
+    # already committed the rotation, and that costs a user their session over a lost
+    # packet. 30s is Okta's default (Okta caps at 60, Ory Hydra at 300); it is
+    # borrowed, not measured against how MCP clients actually retry.
+    "REFRESH_TOKEN_REUSE_PROTECTION": True,
+    "REFRESH_TOKEN_GRACE_PERIOD_SECONDS": 30,
+    # Inactivity, not a deadline: `validate_refresh_token` puts the cutoff at the
+    # access token's expiry plus this, and rotation mints a fresh access token, so a
+    # client in daily use never expires and seven days of silence kills it. Left
+    # unset, refresh tokens never expire at all, which RFC 10017 §6.3.2 forbids —
+    # a maximum lifetime or an inactivity window, and django-oauth-toolkit can only
+    # express the second. Seven days is Okta's inactivity window on the same sliding
+    # mechanism.
+    "REFRESH_TOKEN_EXPIRE_SECONDS": 60 * 60 * 24 * 7,
+    # Registration has to be open, because a client registers itself before any
+    # browser opens — there is no session to authenticate it with at that point.
+    # The default, IsAuthenticatedDCRPermission, wants a session and so refuses
+    # every MCP client. The cost is a public write endpoint on each deployment:
+    # anyone who can reach it can create an Application row. That grants nothing
+    # on its own — a registered client still has no token until a user logs in
+    # and consents — but it is a surface, and it is worth rate-limiting before a
+    # deployment is reachable from the internet.
+    "DCR_REGISTRATION_PERMISSION_CLASSES": (
+        "oauth2_provider.dcr.AllowAllDCRPermission",
+    ),
+}
+
+# The MCP endpoint, served from this process by config.mcp_mount.
+#
+# MCP_RESOURCE_URL is an identity, not a routing hint: it is the audience a client
+# names in its RFC 8707 `resource` parameter and the string the verifier requires to
+# be on a token. It has to be the URL clients actually reach this deployment at, or
+# every token is issued for one audience and checked against another.
+MCP_RESOURCE_URL = env("MCP_RESOURCE_URL", default="http://localhost:8000/mcp")
+MCP_ISSUER_URL = env("MCP_ISSUER_URL", default="http://localhost:8000")
+
+# Pin the issuer instead of letting django-oauth-toolkit derive one per request.
+# `config/urls.py` mounts the RFC 8414 document twice, and the derivation names
+# whichever mount served it — so the root copy called this server
+# "http://host" and the prefixed copy called it "http://host/o". RFC 8414 makes
+# `issuer` the server's identity and compares it by exact string, so two names is
+# one too many. Set here rather than in the block above because it has to agree
+# with MCP_ISSUER_URL, which is what the MCP endpoint advertises, and one variable
+# is what keeps them from drifting.
+OAUTH2_PROVIDER["OIDC_ISS_ENDPOINT"] = MCP_ISSUER_URL
+
+# Two RFC 9700 deployment findings this deployment answers with a reason rather than
+# a setting. `manage.py check --deploy` is a merge gate (.github/workflows/ci.yml),
+# so leaving them to be re-triaged on every run costs more than recording why.
+#
+# W008 — plaintext `http` redirect URIs. Removing "http" from
+# ALLOWED_REDIRECT_URI_SCHEMES also disallows the RFC 8252 loopback callback, which
+# is `http://127.0.0.1:<ephemeral>` for every native MCP client there is; the hint on
+# the check says so itself. ALLOW_LOCALHOST_LOOPBACK above exists to support exactly
+# that flow, so this is the scheme the product depends on, not one nobody removed.
+#
+# W006 — plaintext token storage. Wanted, and it breaks concurrent refresh. Measured
+# 2026-08-28 against the dev stack: two simultaneous refreshes of the same token
+# return one 200 and one 500, `AccessToken matching query does not exist`. The second
+# request reaches the grace branch of `_save_bearer_token` (:1039-1058), which hands
+# back `previous_access_token.token` — blank under hashed storage — and
+# `authorization_flow_token_response` (views/base.py:505) then looks that empty string
+# up with an unguarded `.get()`. django-oauth-toolkit's own E001 catches the same
+# collision only when REFRESH_TOKEN_GRACE_PERIOD_SECONDS is non-zero; concurrency
+# reaches the branch at any grace setting, so the check does not cover this. Revisit
+# when that `.get()` is guarded upstream.
+SILENCED_SYSTEM_CHECKS = [
+    "oauth2_provider.W006",
+    "oauth2_provider.W008",
 ]
 
 
@@ -285,6 +446,20 @@ AI_API_KEY = env("AI_API_KEY", default="")
 # Cap how long a suggestion request waits on the model before failing with an
 # actionable error rather than hanging the user's request indefinitely.
 AI_REQUEST_TIMEOUT = env.int("AI_REQUEST_TIMEOUT", default=60)
+
+# Which addresses a model endpoint may resolve to, whether it came from
+# AI_BASE_URL above or from an organization's own saved config. Organizations set
+# their own base_url through the UI and Precogly fetches it server-side, which is
+# what this guards; see apps.ai.url_policy.
+#
+#   allow-loopback   127.0.0.0/8 and ::1 as well as public addresses
+#   deny-private     public addresses only
+#
+# Permissive here because running a model beside Precogly is what a local install
+# is for — docker-compose.yml carries a socat sidecar so that http://localhost:1234
+# reaches the host. production.py tightens it, which is where the deployment has
+# already said it is exposed.
+AI_PROVIDER_URL_POLICY = env.str("AI_PROVIDER_URL_POLICY", default="allow-loopback")
 
 # The AI_* values above act as the *fallback* provider: a single operator-wide
 # config used when an organization has not saved its own AIProviderConfig. Orgs

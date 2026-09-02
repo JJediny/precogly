@@ -14,6 +14,7 @@ from django.conf import settings
 from django.db import models
 
 from apps.core.models import TimestampedModel
+from apps.core.tenancy import Tenancy
 
 from .crypto import decrypt, encrypt
 from .providers.base import ResolvedConfig
@@ -21,6 +22,8 @@ from .providers.base import ResolvedConfig
 
 class AIProviderConfig(TimestampedModel):
     """An organization's configuration for one AI model endpoint."""
+
+    tenancy = Tenancy.TENANT_OWNED
 
     class ProviderType(models.TextChoices):
         # Only OpenAI-compatible endpoints are supported today. New, non-
@@ -114,6 +117,8 @@ class AIUsageRecord(TimestampedModel):
     system. ``model``/``provider_type`` are snapshots so history stays correct
     when a config is later edited or deleted.
     """
+
+    tenancy = Tenancy.TENANT_OWNED
 
     organization = models.ForeignKey(
         "organizations.Organization",

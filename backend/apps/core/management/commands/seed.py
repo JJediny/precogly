@@ -13,20 +13,27 @@ Usage:
     python manage.py seed --force  (re-import packs even if they exist)
 """
 
-from django.core.management.base import BaseCommand
 from django.contrib.auth import get_user_model
+from django.core.management.base import BaseCommand, CommandError
 
-from apps.organizations.models import Organization, OrganizationMember, Team, TeamMembership
-from apps.packs.models import LibraryPack
-from apps.threat_models.models import ThreatModel, ThreatModelLibraryPack
 from apps.diagrams.models import DFD, DFDTemplatesLibrary
 from apps.diagrams.services import sync_dfd_nodes_to_components
+from apps.organizations.models import (
+    Organization,
+    OrganizationMember,
+    Team,
+    TeamMembership,
+)
+from apps.packs.models import LibraryPack
 from apps.packs.services import get_libraries_path, import_pack_from_path, validate_pack
+from apps.threat_models.models import ThreatModel, ThreatModelLibraryPack
 
 User = get_user_model()
 
 DEMO_EMAIL = "admin@precogly.dev"
-DEMO_PASSWORD = "admin123"
+# Published in the setup docs on purpose, so a new contributor can sign in to a
+# freshly seeded database. It grants nothing beyond a local demo organization.
+DEMO_PASSWORD = "admin123"  # noqa: S105
 DEMO_ORG_NAME = "Demo Organization"
 DEMO_TEAM_NAME = "My Team"
 
@@ -127,7 +134,9 @@ class Command(BaseCommand):
                 plan=Organization.Plan.FREE,
                 is_primary=True,
             )
-            self.stdout.write(self.style.SUCCESS(f"Created organization: {DEMO_ORG_NAME}"))
+            self.stdout.write(
+                self.style.SUCCESS(f"Created organization: {DEMO_ORG_NAME}")
+            )
 
         self._ensure_default_team(org, DEMO_TEAM_NAME)
         return org
@@ -151,7 +160,9 @@ class Command(BaseCommand):
             self.stdout.write(f"{label} already exists: {email}")
             return existing
 
-        create = User.objects.create_superuser if superuser else User.objects.create_user
+        create = (
+            User.objects.create_superuser if superuser else User.objects.create_user
+        )
         user = create(username=email, email=email, password=DEMO_PASSWORD)
         self.stdout.write(self.style.SUCCESS(f"Created {label.lower()}: {email}"))
         return user
@@ -249,10 +260,13 @@ class Command(BaseCommand):
     def _import_packs(self, force):
         libraries_path = get_libraries_path()
         if not libraries_path.exists():
-            self.stdout.write(self.style.ERROR(
-                f"Libraries path not found: {libraries_path}"
-            ))
-            return
+            # Loud on purpose. Returning here seeds every organization, user and
+            # sample threat model while importing no packs at all, and a database
+            # whose libraries are empty looks seeded from the outside.
+            raise CommandError(
+                f"Libraries path not found: {libraries_path}. "
+                "Set LIBRARIES_PATH to the directory holding packs/."
+            )
 
         all_packs = TAXONOMY_PACKS + STANDARD_PACKS + FULL_PACKS
         for pack_slug in all_packs:
@@ -267,8 +281,12 @@ class Command(BaseCommand):
                 for error in validation_result.errors:
                     self.stdout.write(self.style.ERROR(f"  Error: {error.message}"))
                 for warning in validation_result.warnings:
-                    self.stdout.write(self.style.WARNING(f"  Warning: {warning.message}"))
-                self.stdout.write(self.style.WARNING(f"Skipped: {pack_slug} — validation failed"))
+                    self.stdout.write(
+                        self.style.WARNING(f"  Warning: {warning.message}")
+                    )
+                self.stdout.write(
+                    self.style.WARNING(f"Skipped: {pack_slug} — validation failed")
+                )
                 continue
 
             result = import_pack_from_path(
@@ -280,7 +298,9 @@ class Command(BaseCommand):
             if result.success:
                 self.stdout.write(self.style.SUCCESS(f"Imported: {pack_slug}"))
             else:
-                self.stdout.write(self.style.WARNING(f"Skipped: {pack_slug} — {result.message}"))
+                self.stdout.write(
+                    self.style.WARNING(f"Skipped: {pack_slug} — {result.message}")
+                )
 
     def _create_sample_threat_models(self, org, team, user, samples):
         for sample in samples:
@@ -298,10 +318,12 @@ class Command(BaseCommand):
                     qualified_slug=template_slug
                 ).first()
                 if not template:
-                    self.stdout.write(self.style.WARNING(
-                        f"DFD template not found: {template_slug}. "
-                        "Threat model created without diagram."
-                    ))
+                    self.stdout.write(
+                        self.style.WARNING(
+                            f"DFD template not found: {template_slug}. "
+                            "Threat model created without diagram."
+                        )
+                    )
 
             criticality = getattr(ThreatModel.Criticality, sample["criticality"])
 
@@ -329,8 +351,10 @@ class Command(BaseCommand):
             # Connect all imported packs before generating threats
             imported_packs = LibraryPack.objects.all()
             ThreatModelLibraryPack.objects.bulk_create(
-                [ThreatModelLibraryPack(threat_model=threat_model, library_pack=pack)
-                 for pack in imported_packs],
+                [
+                    ThreatModelLibraryPack(threat_model=threat_model, library_pack=pack)
+                    for pack in imported_packs
+                ],
                 ignore_conflicts=True,
             )
 
@@ -348,10 +372,12 @@ class Command(BaseCommand):
             components_count = sync_result.get("created_count", 0)
             threats_count = sync_result.get("threats_generated", 0)
 
-            self.stdout.write(self.style.SUCCESS(
-                f"Created: {name} "
-                f"({components_count} components, {threats_count} threats)"
-            ))
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"Created: {name} "
+                    f"({components_count} components, {threats_count} threats)"
+                )
+            )
 
     def _connect_packs_to_threat_models(self):
         """Ensure all imported packs are connected to all threat models."""
@@ -370,9 +396,11 @@ class Command(BaseCommand):
         )
         count = len(created)
         if count:
-            self.stdout.write(self.style.SUCCESS(
-                f"Connected {all_packs.count()} packs to {all_threat_models.count()} threat models"
-            ))
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"Connected {all_packs.count()} packs to {all_threat_models.count()} threat models"
+                )
+            )
 
     def _report_accounts(self):
         """Print the seeded logins as a table.
@@ -391,13 +419,14 @@ class Command(BaseCommand):
         self.stdout.write("  URL:      http://localhost:5173")
         self.stdout.write(f"  Password: {DEMO_PASSWORD}   (every account below)")
         self.stdout.write("")
-        self.stdout.write(self.style.MIGRATE_HEADING(
-            f"  {'EMAIL':<22} {'ORGANIZATION':<20} ROLE"
-        ))
+        self.stdout.write(
+            self.style.MIGRATE_HEADING(f"  {'EMAIL':<22} {'ORGANIZATION':<20} ROLE")
+        )
 
         memberships = (
-            OrganizationMember.objects
-            .filter(user__username__in=[DEMO_EMAIL, ANALYST_EMAIL, SECOND_ORG_EMAIL])
+            OrganizationMember.objects.filter(
+                user__username__in=[DEMO_EMAIL, ANALYST_EMAIL, SECOND_ORG_EMAIL]
+            )
             .select_related("organization", "user")
             .order_by("user__username")
         )

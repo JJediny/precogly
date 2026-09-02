@@ -266,7 +266,7 @@ LLM-generated content needs careful human review. Check each area:
 
 ### Automatic validation on import
 
-Validation runs automatically when you click **Import** in the UI. If your pack has structural issues (wrong key names, invalid enum values, missing fields), you will see a dialog listing each problem with a suggested fix. Both warnings and errors block import. Fix the issues in your YAML files and re-import.
+Validation runs automatically when you click **Import** in the UI. If your pack has structural issues (wrong key names, invalid enum values, missing fields), you will see a dialog listing each problem with a suggested fix. Errors block import and must be fixed. Warnings pause the import for review; if they are acceptable, click **Import Anyway** to continue.
 
 **Warnings** identify issues that would cause data loss (e.g., using `id` instead of `slug` for frameworks):
 

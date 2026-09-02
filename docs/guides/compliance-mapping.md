@@ -166,7 +166,6 @@ The following compliance packs ship with cross-framework requirement mappings:
 | `aami-tir57` | AAMI TIR57 | IEC 81001 | `requirements-iec-81001.yaml` |
 | `imdrf-cyber` | IMDRF Cyber | FDA Premarket | `requirements-fda-premarket.yaml` |
 | `eu-mdr-cyber` | EU MDR Cyber | IEC 81001 | `requirements-iec-81001.yaml` |
-| `nist-csf-health` | NIST CSF Health | HIPAA Security | `requirements-hipaa-security.yaml` |
 | `ul-2900` | UL 2900 | IEC 62443-4-1 | `requirements-iec-62443-4-1.yaml` |
 | `pci-dss` | PCI DSS | OWASP AISVS | `requirements-owasp-aisvs.yaml` |
 

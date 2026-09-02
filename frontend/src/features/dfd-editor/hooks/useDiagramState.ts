@@ -35,12 +35,14 @@ interface UseDiagramStateReturn {
   updateTitle: (title: string) => Promise<void>
   // Undo feature - remove this line to disable undo functionality
   undo: () => void
+  redo: () => void
 
   // State
   hasUnsavedChanges: boolean
   lastSaved: Date | null
   // Undo feature - remove this line to disable undo functionality
   canUndo: boolean
+  canRedo: boolean
 }
 
 async function fetchDiagram(diagramId: string): Promise<Diagram> {
@@ -117,9 +119,10 @@ export function useDiagramState({
   )
 
   // Undo feature - remove this block to disable undo functionality
-  const { pushToHistory, undo: undoFromHistory, canUndo } = useUndoHistory()
+  const { pushToHistory, undo: undoFromHistory, redo: redoFromHistory, canUndo, canRedo } = useUndoHistory()
   const nodesRef = useRef<DiagramNode[]>(nodes)
   const edgesRef = useRef<DiagramEdge[]>(edges)
+  const nodeDragHistoryRef = useRef(false)
   // Keep refs in sync for undo access
   useEffect(() => {
     nodesRef.current = nodes
@@ -240,10 +243,25 @@ export function useDiagramState({
     const hasRealChanges = changes.some(
       (c) => c.type !== 'select' && c.type !== 'dimensions'
     )
+    const hasDraggingChange = changes.some(
+      (c) => c.type === 'position' && c.dragging === true
+    )
+    const hasPositionChange = changes.some((c) => c.type === 'position')
+    const endsDragging = changes.some(
+      (c) => c.type === 'position' && c.dragging === false
+    )
     // Undo feature - push to history before meaningful changes
     if (hasRealChanges) {
-      pushToHistory({ nodes: nodesRef.current, edges: edgesRef.current })
+      if (hasDraggingChange) {
+        if (!nodeDragHistoryRef.current) {
+          pushToHistory({ nodes: nodesRef.current, edges: edgesRef.current })
+        }
+        nodeDragHistoryRef.current = true
+      } else if (!hasPositionChange || !nodeDragHistoryRef.current) {
+        pushToHistory({ nodes: nodesRef.current, edges: edgesRef.current })
+      }
     }
+    if (endsDragging) nodeDragHistoryRef.current = false
     // Use internal setter - we handle hasUnsavedChanges manually for selective detection
     setNodesInternal((nds) => applyNodeChanges(changes, nds) as DiagramNode[])
     if (hasRealChanges) {
@@ -291,13 +309,22 @@ export function useDiagramState({
 
   // Undo feature - remove this block to disable undo functionality
   const undo = useCallback(() => {
-    const previousState = undoFromHistory()
+    const previousState = undoFromHistory({ nodes: nodesRef.current, edges: edgesRef.current })
     if (previousState) {
       setNodes(previousState.nodes)
       setEdges(previousState.edges)
       setHasUnsavedChanges(true)
     }
-  }, [undoFromHistory])
+  }, [undoFromHistory, setNodes, setEdges])
+
+  const redo = useCallback(() => {
+    const nextState = redoFromHistory({ nodes: nodesRef.current, edges: edgesRef.current })
+    if (nextState) {
+      setNodes(nextState.nodes)
+      setEdges(nextState.edges)
+      setHasUnsavedChanges(true)
+    }
+  }, [redoFromHistory, setNodes, setEdges])
 
   // Warn before leaving with unsaved changes
   useEffect(() => {
@@ -330,6 +357,8 @@ export function useDiagramState({
     // Undo feature - remove these lines to disable undo functionality
     undo,
     canUndo: canUndo(),
+    redo,
+    canRedo: canRedo(),
     hasUnsavedChanges,
     lastSaved,
   }

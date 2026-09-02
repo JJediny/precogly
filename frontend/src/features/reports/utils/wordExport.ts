@@ -4,6 +4,7 @@ import {
   Table,
   TextRun,
   HeadingLevel,
+  ImageRun,
 } from 'docx'
 import type { ReportData, ReportThreat } from '../types/report'
 import {
@@ -118,14 +119,6 @@ function buildSummarySection(data: ReportData): (Paragraph | Table)[] {
           spacer(),
         ]
       : []),
-    h2('2.5 STRIDE Distribution'),
-    spacer(),
-    buildTable(
-      [4680, 4680],
-      ['STRIDE Category', 'Count'],
-      Object.entries(data.threatAnalysis.strideSummary).map(([k, v]) => [k, String(v)]),
-    ),
-    spacer(),
   ]
 }
 
@@ -172,7 +165,7 @@ function buildScopeSection(data: ReportData): (Paragraph | Table)[] {
   return children
 }
 
-function buildArchitectureSection(data: ReportData): (Paragraph | Table)[] {
+function buildArchitectureSection(data: ReportData, dfdImages: Map<string, Uint8Array>): (Paragraph | Table)[] {
   const arch = data.architecture
   const children: (Paragraph | Table)[] = [h1('4. System Architecture'), spacer()]
 
@@ -199,7 +192,9 @@ function buildArchitectureSection(data: ReportData): (Paragraph | Table)[] {
     arch.dfds.forEach((dfd, idx) => {
       children.push(
         h3(`Figure ${idx + 1}: ${dfd.name}${dfd.isPrimary ? ' (Primary)' : ''}`),
-        placeholder(`Insert DFD diagram screenshot here — ${dfd.name}`),
+        ...(dfdImages.get(dfd.id)
+          ? [new Paragraph({ children: [new ImageRun({ data: dfdImages.get(dfd.id)!, type: 'png', transformation: { width: 600, height: 360 } })] })]
+          : [placeholder(`DFD diagram unavailable — ${dfd.name}`)]),
         spacer(),
       )
 
@@ -269,23 +264,16 @@ function buildArchitectureSection(data: ReportData): (Paragraph | Table)[] {
 }
 
 function buildDataAssetsSection(data: ReportData): (Paragraph | Table)[] {
-  if (data.dataAssets.length === 0) return []
-
   return [
     h1('5. Data Assets'),
     spacer(),
-    buildTable(
-      [1800, 1440, 1260, 1260, 1260, 2340],
-      ['Name', 'Classification', 'Confidentiality', 'Integrity', 'Availability', 'Description'],
-      data.dataAssets.map((a) => [
-        a.name,
-        a.classification,
-        a.confidentiality,
-        a.integrity,
-        a.availability,
-        a.description,
-      ]),
-    ),
+    ...(data.dataAssets.length > 0
+      ? [buildTable(
+          [1800, 1440, 1260, 1260, 1260, 2340],
+          ['Name', 'Classification', 'Confidentiality', 'Integrity', 'Availability', 'Description'],
+          data.dataAssets.map((a) => [a.name, a.classification, a.confidentiality, a.integrity, a.availability, a.description]),
+        ) as Paragraph | Table]
+      : [para('No data assets defined.') as Paragraph | Table]),
     spacer(),
   ]
 }
@@ -299,69 +287,44 @@ function buildComponentsSection(data: ReportData): (Paragraph | Table)[] {
     ...c.systemActors.map((p) => ({ ...p, _type: 'System Actor' })),
   ]
 
-  if (allComponents.length === 0) return []
-
-  return [
-    h1('6. Component Inventory'),
-    spacer(),
-    buildTable(
-      [2400, 1440, 1440, 1440, 2640],
-      ['Name', 'Type', 'Category', 'Trust Zone', 'Description'],
-      allComponents.map((c) => {
-        const displayType = c._type === 'Human Actor' && c.actorType
-          ? `${c._type}\n(${formatActorType(c.actorType)})`
-          : c._type
-        return [
-          c.name,
-          displayType,
-          c.category,
-          c.trustZone ?? '—',
-          c.description,
-        ]
-      }),
-    ),
-    spacer(),
-  ]
-}
-
-function buildThreatAnalysisSection(data: ReportData): (Paragraph | Table)[] {
-  const allThreats = flattenThreats(data)
-  if (allThreats.length === 0) return []
+  if (allComponents.length === 0 && data.dataFlows.length === 0) return []
 
   const children: (Paragraph | Table)[] = [
-    h1('7. Threat Analysis'),
-    spacer(),
-    para(
-      `This section documents ${allThreats.length} identified threats across all system components and data flows.`,
-    ),
-    spacer(),
-    buildTable(
-      [3240, 2160, 960, 960, 960, 1080],
-      ['Threat Name', 'Component / Data Flow', 'STRIDE', 'Inherent Severity', 'Status', 'CMs'],
-      allThreats.map(({ threat, context }) => [
-        threat.threatName,
-        context,
-        threat.strideCategory ?? '—',
-        threat.inherentSeverity,
-        threat.status,
-        String(threat.countermeasures.length),
-      ]),
-    ),
+    h1('6. Component Inventory'),
     spacer(),
   ]
 
-  // Dismissed threats
-  if (data.threatAnalysis.dismissedThreats.length > 0) {
+  if (allComponents.length > 0) {
     children.push(
-      h2('7.1 Dismissed Threats'),
+      buildTable(
+        [2400, 1440, 1440, 1440, 2640],
+        ['Name', 'Type', 'Category', 'Trust Zone', 'Description'],
+        allComponents.map((c) => {
+          const displayType = c._type === 'Human Actor' && c.actorType
+            ? `${c._type}\n(${formatActorType(c.actorType)})`
+            : c._type
+          return [c.name, displayType, c.category, c.trustZone ?? '—', c.description]
+        }),
+      ),
+      spacer(),
+    )
+  }
+
+  if (data.dataFlows.length > 0) {
+    children.push(
+      h2('6.1 Data Flows'),
       spacer(),
       buildTable(
-        [3240, 2880, 3240],
-        ['Threat Name', 'Component / Data Flow', 'Dismissal Reason'],
-        data.threatAnalysis.dismissedThreats.map((t) => [
-          t.threatName,
-          t.componentName ?? t.flowLabel ?? '—',
-          t.dismissalReason,
+        [1800, 1440, 1440, 1260, 1080, 1080, 1260],
+        ['Label', 'Source', 'Destination', 'Protocol', 'Encrypted', 'Authenticated', 'Trust Zone Crossing'],
+        data.dataFlows.map((flow) => [
+          flow.label,
+          flow.source ?? '—',
+          flow.destination ?? '—',
+          flow.protocol || '—',
+          flow.encrypted ? 'Yes' : 'No',
+          flow.authenticated ? 'Yes' : 'No',
+          flow.crossesTrustZone ? 'Yes' : 'No',
         ]),
       ),
       spacer(),
@@ -369,6 +332,121 @@ function buildThreatAnalysisSection(data: ReportData): (Paragraph | Table)[] {
   }
 
   return children
+}
+
+function buildThreatAnalysisSection(data: ReportData): (Paragraph | Table)[] {
+  const allThreats = flattenThreats(data)
+
+  const children: (Paragraph | Table)[] = [
+    h1('8. Threat Analysis'),
+    spacer(),
+    ...(allThreats.length > 0
+      ? [
+          para(`This section documents ${allThreats.length} identified threats across all system components and data flows.`),
+          spacer(),
+          buildTable(
+            [3240, 2160, 960, 960, 960, 1080],
+            ['Threat Name', 'Component / Data Flow', 'STRIDE', 'Inherent Severity', 'Status', 'CMs'],
+            allThreats.map(({ threat, context }) => [threat.threatName, context, threat.strideCategory ?? '—', threat.inherentSeverity, threat.status, String(threat.countermeasures.length)]),
+          ) as Paragraph | Table,
+        ]
+      : [para('No active threats defined.') as Paragraph | Table]),
+    spacer(),
+  ]
+
+  return children
+}
+
+function buildStrideSummarySection(data: ReportData): (Paragraph | Table)[] {
+  return [
+    h1('7. STRIDE Summary'),
+    spacer(),
+    buildTable(
+      [6240, 3120],
+      ['STRIDE Category', 'Threats'],
+      Object.entries(data.threatAnalysis.strideSummary).map(([category, count]) => [category, String(count)]),
+    ),
+    spacer(),
+  ]
+}
+
+function buildDismissedThreatsSection(data: ReportData): (Paragraph | Table)[] {
+  const dismissed = data.threatAnalysis.dismissedThreats
+  return [
+    h1('9. Dismissed Threats'),
+    spacer(),
+    ...(dismissed.length > 0
+      ? [buildTable(
+          [3240, 2880, 3240],
+          ['Threat Name', 'Component / Data Flow', 'Dismissal Reason'],
+          dismissed.map((t) => [t.threatName, t.componentName ?? t.flowLabel ?? '—', t.dismissalReason]),
+        ) as Paragraph | Table]
+      : [para('No dismissed threats.') as Paragraph | Table]),
+    spacer(),
+  ]
+}
+
+function buildCountermeasureStatusSection(data: ReportData): (Paragraph | Table)[] {
+  const rows = Object.entries(data.countermeasureSummary.statusBreakdown)
+    .map(([status, count]) => [status, String(count)])
+  return [
+    h1('10. Countermeasure Status'),
+    spacer(),
+    buildTable([6240, 3120], ['Status', 'Count'], rows),
+    spacer(),
+  ]
+}
+
+function buildGapsSection(data: ReportData): (Paragraph | Table)[] {
+  const gaps = data.countermeasureSummary.gaps
+  return [
+    h1('11. Gaps'),
+    spacer(),
+    ...(gaps.length > 0
+      ? [buildTable(
+          [2880, 2160, 1440, 2880],
+          ['Countermeasure', 'Component / Data Flow', 'Priority', 'Assigned Owner'],
+          gaps.map((g) => [g.countermeasureName, g.componentName ?? g.flowLabel ?? '—', g.priority, g.assignedOwnerEmail ?? 'Unassigned']),
+        ) as Paragraph | Table]
+      : [para('No open gaps.') as Paragraph | Table]),
+    spacer(),
+  ]
+}
+
+function buildWaivedSection(data: ReportData): (Paragraph | Table)[] {
+  const waived = data.countermeasureSummary.waived
+  return [
+    h1('12. Waived Countermeasures'),
+    spacer(),
+    ...(waived.length > 0
+      ? [buildTable(
+          [4680, 4680],
+          ['Countermeasure', 'Component / Data Flow'],
+          waived.map((item) => [item.countermeasureName, item.componentName ?? item.flowLabel ?? '—']),
+        ) as Paragraph | Table]
+      : [para('No waived countermeasures.') as Paragraph | Table]),
+    spacer(),
+  ]
+}
+
+function buildInheritedSection(data: ReportData): (Paragraph | Table)[] {
+  const inherited = data.countermeasureSummary.inherited
+  return [
+    h1('13. Inherited Countermeasures'),
+    spacer(),
+    ...(inherited.length > 0
+      ? [buildTable(
+          [2880, 2160, 4320],
+          ['Countermeasure', 'Component', 'Inherited From'],
+          inherited.map((item) => [
+            item.countermeasureName,
+            item.componentName,
+            `${item.inheritedFromComponentName} (${item.inheritedFromZoneName})`,
+          ]),
+        ) as Paragraph | Table]
+      : [para('No inherited countermeasures.') as Paragraph | Table]),
+    spacer(),
+  ]
 }
 
 function buildCountermeasuresSection(data: ReportData): (Paragraph | Table)[] {
@@ -391,32 +469,73 @@ function buildCountermeasuresSection(data: ReportData): (Paragraph | Table)[] {
     }
   }
 
-  if (rows.length === 0) return []
-
   const children: (Paragraph | Table)[] = [
-    h1('8. Countermeasures'),
+    h1('14. Countermeasure Detail'),
     spacer(),
-    buildTable(
-      [2160, 1080, 900, 780, 1440, 1440, 1560],
-      ['Countermeasure', 'Control Type', 'Status', 'Priority', 'Inherited', 'Associated Threat', 'Component'],
-      rows,
-    ),
+    ...(rows.length > 0
+      ? [buildTable(
+          [2160, 1080, 900, 780, 1440, 1440, 1560],
+          ['Countermeasure', 'Control Type', 'Status', 'Priority', 'Inherited', 'Associated Threat', 'Component'],
+          rows,
+        ) as Paragraph | Table]
+      : [para('No countermeasures defined.') as Paragraph | Table]),
     spacer(),
   ]
 
-  // Gaps
-  if (data.countermeasureSummary.gaps.length > 0) {
+  return children
+}
+
+function buildRisksSection(data: ReportData): (Paragraph | Table)[] {
+  return [
+    h1('15. Risk Register'),
+    spacer(),
+    ...(data.risks.length > 0
+      ? [buildTable(
+          [2160, 1200, 1200, 1200, 1200, 2400],
+          ['Risk Name', 'Inherent Score', 'Inherent Level', 'Residual Score', 'Residual Level', 'Owner'],
+          data.risks.map((r) => [r.name, String(r.inherentScore), r.inherentLevel, String(r.residualScore), r.residualLevel, r.ownerEmail ?? 'Unassigned']),
+        ) as Paragraph | Table]
+      : [para('No risks defined.') as Paragraph | Table]),
+    spacer(),
+  ]
+}
+
+function buildComplianceSection(data: ReportData): (Paragraph | Table)[] {
+  return [
+    h1('16. Compliance Mapping'),
+    spacer(),
+    ...(data.compliance.frameworks.length > 0
+      ? [buildTable(
+          [3240, 1680, 1680, 2760],
+          ['Framework', 'Total Requirements', 'Covered', 'Coverage %'],
+          data.compliance.frameworks.map((fw) => [fw.name, String(fw.totalRequirements), String(fw.coveredRequirements), `${fw.coveragePercentage.toFixed(1)}%`]),
+        ) as Paragraph | Table]
+      : [para('No compliance frameworks linked.') as Paragraph | Table]),
+    spacer(),
+  ]
+}
+
+function buildCrossFrameworkMappingsSection(data: ReportData): (Paragraph | Table)[] {
+  const groups = data.compliance.crossFrameworkMappings ?? []
+  const children: (Paragraph | Table)[] = [h1('17. Cross-Framework Mappings'), spacer()]
+
+  if (groups.length === 0) {
+    children.push(para('No cross-framework requirement mappings available.'), spacer())
+    return children
+  }
+
+  for (const group of groups) {
     children.push(
-      h2('8.1 Open Gaps'),
+      h2(`${group.sourceFramework} → ${group.targetFramework}`),
       spacer(),
       buildTable(
-        [3240, 2160, 1440, 2520],
-        ['Countermeasure', 'Component / Data Flow', 'Priority', 'Assigned Owner'],
-        data.countermeasureSummary.gaps.map((g) => [
-          g.countermeasureName,
-          g.componentName ?? g.flowLabel ?? '—',
-          g.priority,
-          g.assignedOwnerEmail ?? 'Unassigned',
+        [1800, 3000, 1800, 2760],
+        ['Source', 'Source Description', 'Target', 'Target Description / Sufficiency'],
+        group.mappings.map((entry) => [
+          entry.fromSectionCode,
+          entry.fromDescription,
+          entry.toSectionCode,
+          `${entry.toDescription}\n${entry.sufficiency}`,
         ]),
       ),
       spacer(),
@@ -426,53 +545,83 @@ function buildCountermeasuresSection(data: ReportData): (Paragraph | Table)[] {
   return children
 }
 
-function buildRisksSection(data: ReportData): (Paragraph | Table)[] {
-  if (data.risks.length === 0) return []
-
+function buildAssumptionsReviewSection(data: ReportData): (Paragraph | Table)[] {
+  const assumptions = data.scope.assumptions
   return [
-    h1('9. Risk Register'),
+    h1('18. Assumptions Review'),
     spacer(),
-    buildTable(
-      [2160, 1200, 1200, 1200, 1200, 2400],
-      ['Risk Name', 'Inherent Score', 'Inherent Level', 'Residual Score', 'Residual Level', 'Owner'],
-      data.risks.map((r) => [
-        r.name,
-        String(r.inherentScore),
-        r.inherentLevel,
-        String(r.residualScore),
-        r.residualLevel,
-        r.ownerEmail ?? 'Unassigned',
-      ]),
-    ),
+    ...(assumptions.length > 0
+      ? [buildTable(
+          [4320, 1800, 3240],
+          ['Assumption', 'Validity', 'Topics'],
+          assumptions.map((assumption) => [assumption.description, assumption.validity, assumption.topics.join(', ') || '—']),
+        ) as Paragraph | Table]
+      : [para('No assumptions defined.') as Paragraph | Table]),
     spacer(),
   ]
 }
 
-function buildComplianceSection(data: ReportData): (Paragraph | Table)[] {
-  if (data.compliance.frameworks.length === 0) return []
+function buildFindingsSection(data: ReportData): (Paragraph | Table)[] {
+  const findings: string[][] = []
+  const exposed = data.summaryMetrics.threatsByStatus.exposed ?? 0
+  const criticalGaps = data.countermeasureSummary.gaps.filter((gap) => gap.priority === 'critical')
+  const highRisks = data.risks.filter((risk) => risk.residualLevel === 'critical' || risk.residualLevel === 'high')
+  const unconfirmed = data.scope.assumptions.filter((assumption) => assumption.validity === 'unconfirmed')
+
+  if (exposed > 0) findings.push(['High', `${exposed} exposed threat${exposed === 1 ? '' : 's'}`, 'Unaddressed countermeasure gaps require attention.'])
+  if (criticalGaps.length > 0) findings.push(['Critical', `${criticalGaps.length} critical-priority gap${criticalGaps.length === 1 ? '' : 's'}`, criticalGaps.map((gap) => gap.countermeasureName).join(', ')])
+  if (highRisks.length > 0) findings.push(['High', `${highRisks.length} high/critical residual risk${highRisks.length === 1 ? '' : 's'}`, highRisks.map((risk) => risk.name).join(', ')])
+  if (unconfirmed.length > 0) findings.push(['Medium', `${unconfirmed.length} unconfirmed assumption${unconfirmed.length === 1 ? '' : 's'}`, 'Confirm or reject assumptions before relying on this model.'])
+  if (data.summaryMetrics.totalWaived > 0) findings.push(['Info', `${data.summaryMetrics.totalWaived} waived countermeasure${data.summaryMetrics.totalWaived === 1 ? '' : 's'}`, 'Risk has been accepted for these countermeasures.'])
+  if (findings.length === 0) findings.push(['Info', 'No significant findings', 'No critical or high-priority findings were derived from the report data.'])
 
   return [
-    h1('10. Compliance Coverage'),
+    h1('19. Findings & Action Items'),
     spacer(),
-    buildTable(
-      [3240, 1680, 1680, 2760],
-      ['Framework', 'Total Requirements', 'Covered', 'Coverage %'],
-      data.compliance.frameworks.map((fw) => [
-        fw.name,
-        String(fw.totalRequirements),
-        String(fw.coveredRequirements),
-        `${fw.coveragePercentage.toFixed(1)}%`,
-      ]),
-    ),
+    buildTable([1080, 3240, 5040], ['Severity', 'Finding', 'Detail'], findings),
     spacer(),
   ]
+}
+
+function buildProgressSection(data: ReportData): (Paragraph | Table)[] {
+  const checklistRows = data.progressChecklist.map((item) => [
+    item.checked ? 'Complete' : 'Incomplete',
+    item.label,
+    item.autoComputed ? 'Automatic' : 'Manual',
+  ])
+  const children: (Paragraph | Table)[] = [h1('20. Completion Status'), spacer()]
+
+  if (checklistRows.length > 0) {
+    children.push(
+      buildTable([1440, 5760, 2160], ['Status', 'Checklist Item', 'Source'], checklistRows),
+      spacer(),
+    )
+  }
+
+  if (data.completionStatus) {
+    children.push(h2('20.1 Completion Cross-Check'), spacer())
+    for (const item of data.completionStatus.systemDefinition) {
+      children.push(para(`${item.checked ? 'Complete' : 'Incomplete'} — ${item.label} (${item.countLabel})`))
+    }
+    for (const item of data.completionStatus.coverage) {
+      children.push(para(`${item.label}: ${item.numerator}/${item.denominator} (${item.percentage}%)`))
+    }
+    children.push(spacer())
+  }
+
+  if (checklistRows.length === 0 && !data.completionStatus) children.push(para('No completion data available.'), spacer())
+  return children
 }
 
 // ---------------------------------------------------------------------------
 // Main export
 // ---------------------------------------------------------------------------
 
-export async function exportWordDoc(data: ReportData, modelName: string): Promise<void> {
+export async function exportWordDoc(
+  data: ReportData,
+  modelName: string,
+  dfdImages: Map<string, Uint8Array>,
+): Promise<void> {
   const children: (Paragraph | Table)[] = [
     // Title page
     new Paragraph({
@@ -498,7 +647,7 @@ export async function exportWordDoc(data: ReportData, modelName: string): Promis
       ],
     }),
     spacer(),
-    placeholder('This document is auto-generated. Review all sections and insert DFD diagrams before submission.'),
+    placeholder('This document is auto-generated. Review all sections before submission.'),
     pageBreak(),
 
     // Sections
@@ -508,19 +657,39 @@ export async function exportWordDoc(data: ReportData, modelName: string): Promis
     pageBreak(),
     ...buildScopeSection(data),
     pageBreak(),
-    ...buildArchitectureSection(data),
+    ...buildArchitectureSection(data, dfdImages),
     pageBreak(),
     ...buildDataAssetsSection(data),
     pageBreak(),
     ...buildComponentsSection(data),
     pageBreak(),
+    ...buildStrideSummarySection(data),
+    pageBreak(),
     ...buildThreatAnalysisSection(data),
+    pageBreak(),
+    ...buildDismissedThreatsSection(data),
+    pageBreak(),
+    ...buildCountermeasureStatusSection(data),
+    pageBreak(),
+    ...buildGapsSection(data),
+    pageBreak(),
+    ...buildWaivedSection(data),
+    pageBreak(),
+    ...buildInheritedSection(data),
     pageBreak(),
     ...buildCountermeasuresSection(data),
     pageBreak(),
     ...buildRisksSection(data),
     pageBreak(),
     ...buildComplianceSection(data),
+    pageBreak(),
+    ...buildCrossFrameworkMappingsSection(data),
+    pageBreak(),
+    ...buildAssumptionsReviewSection(data),
+    pageBreak(),
+    ...buildFindingsSection(data),
+    pageBreak(),
+    ...buildProgressSection(data),
   ]
 
   const doc = new Document({

@@ -6,13 +6,14 @@ from pathlib import Path
 from unittest import mock
 
 import yaml
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, override_settings
 
 from apps.packs.services import (
     ImportResult,
     _find_pack_dir,
     _is_valid_slug,
     discover_packs_from_source,
+    get_libraries_path,
     validate_pack,
 )
 
@@ -222,9 +223,7 @@ class TaxonomyReferenceValidationTests(SimpleTestCase):
             pack_dir = _write_pack(Path(tmp), "good-pack", slug="good-pack")
 
             # Pack defines its own taxonomy
-            tax_data = {
-                "taxonomies": [{"slug": "cwe", "name": "CWE", "entries": []}]
-            }
+            tax_data = {"taxonomies": [{"slug": "cwe", "name": "CWE", "entries": []}]}
             (pack_dir / "taxonomy.yaml").write_text(yaml.safe_dump(tax_data))
 
             joins_dir = pack_dir / "joins"
@@ -254,9 +253,7 @@ class TaxonomyReferenceValidationTests(SimpleTestCase):
             dep_dir = _write_pack(
                 base, "cwe-taxonomy", slug="cwe-taxonomy", pack_type="taxonomy"
             )
-            tax_data = {
-                "taxonomies": [{"slug": "cwe", "name": "CWE", "entries": []}]
-            }
+            tax_data = {"taxonomies": [{"slug": "cwe", "name": "CWE", "entries": []}]}
             (dep_dir / "taxonomy.yaml").write_text(yaml.safe_dump(tax_data))
 
             # Downstream pack references the dependency's taxonomy
@@ -298,7 +295,11 @@ class DuplicateIdValidationTests(SimpleTestCase):
             comp_data = {
                 "components": [
                     {"id": "web-server", "name": "Web Server", "category": "process"},
-                    {"id": "web-server", "name": "Web Server Copy", "category": "process"},
+                    {
+                        "id": "web-server",
+                        "name": "Web Server Copy",
+                        "category": "process",
+                    },
                 ]
             }
             (pack_dir / "components.yaml").write_text(yaml.safe_dump(comp_data))
@@ -306,8 +307,7 @@ class DuplicateIdValidationTests(SimpleTestCase):
             result = validate_pack(pack_dir)
 
             dup_errors = [
-                e for e in result.errors
-                if "Duplicate component id" in e.message
+                e for e in result.errors if "Duplicate component id" in e.message
             ]
             self.assertEqual(len(dup_errors), 1)
             self.assertIn("web-server", dup_errors[0].message)
@@ -332,8 +332,7 @@ class DuplicateIdValidationTests(SimpleTestCase):
             result = validate_pack(pack_dir)
 
             dup_errors = [
-                e for e in result.errors
-                if "Duplicate threat id" in e.message
+                e for e in result.errors if "Duplicate threat id" in e.message
             ]
             self.assertEqual(len(dup_errors), 1)
             self.assertIn("sql-injection", dup_errors[0].message)
@@ -349,8 +348,18 @@ class DuplicateIdValidationTests(SimpleTestCase):
 
             cm_data = {
                 "countermeasures": [
-                    {"slug": "mfa", "name": "MFA", "control_type": "preventive", "cost": "low"},
-                    {"slug": "mfa", "name": "MFA duplicate", "control_type": "preventive", "cost": "low"},
+                    {
+                        "slug": "mfa",
+                        "name": "MFA",
+                        "control_type": "preventive",
+                        "cost": "low",
+                    },
+                    {
+                        "slug": "mfa",
+                        "name": "MFA duplicate",
+                        "control_type": "preventive",
+                        "cost": "low",
+                    },
                 ]
             }
             (pack_dir / "countermeasures.yaml").write_text(yaml.safe_dump(cm_data))
@@ -358,8 +367,7 @@ class DuplicateIdValidationTests(SimpleTestCase):
             result = validate_pack(pack_dir)
 
             dup_errors = [
-                e for e in result.errors
-                if "Duplicate countermeasure id" in e.message
+                e for e in result.errors if "Duplicate countermeasure id" in e.message
             ]
             self.assertEqual(len(dup_errors), 1)
             self.assertIn("mfa", dup_errors[0].message)
@@ -382,22 +390,23 @@ class DuplicateIdValidationTests(SimpleTestCase):
                     "version": "1.0.0",
                     "pack_type": "compliance",
                 },
-                "frameworks": [{
-                    "slug": "test-fw",
-                    "name": "Test Framework",
-                    "requirements": [
-                        {"section_code": "1.1", "description": "First"},
-                        {"section_code": "1.1", "description": "Duplicate"},
-                    ],
-                }],
+                "frameworks": [
+                    {
+                        "slug": "test-fw",
+                        "name": "Test Framework",
+                        "requirements": [
+                            {"section_code": "1.1", "description": "First"},
+                            {"section_code": "1.1", "description": "Duplicate"},
+                        ],
+                    }
+                ],
             }
             (pack_dir / "pack.yaml").write_text(yaml.safe_dump(pack_yaml))
 
             result = validate_pack(pack_dir)
 
             dup_errors = [
-                e for e in result.errors
-                if "Duplicate section_code" in e.message
+                e for e in result.errors if "Duplicate section_code" in e.message
             ]
             self.assertEqual(len(dup_errors), 1)
             self.assertIn("1.1", dup_errors[0].message)
@@ -412,22 +421,23 @@ class DuplicateIdValidationTests(SimpleTestCase):
             pack_dir = _write_pack(Path(tmp), "tax-pack", slug="tax-pack")
 
             tax_data = {
-                "taxonomies": [{
-                    "slug": "cwe",
-                    "name": "CWE",
-                    "entries": [
-                        {"external_id": "CWE-79", "title": "XSS"},
-                        {"external_id": "CWE-79", "title": "XSS duplicate"},
-                    ],
-                }]
+                "taxonomies": [
+                    {
+                        "slug": "cwe",
+                        "name": "CWE",
+                        "entries": [
+                            {"external_id": "CWE-79", "title": "XSS"},
+                            {"external_id": "CWE-79", "title": "XSS duplicate"},
+                        ],
+                    }
+                ]
             }
             (pack_dir / "taxonomy.yaml").write_text(yaml.safe_dump(tax_data))
 
             result = validate_pack(pack_dir)
 
             dup_errors = [
-                e for e in result.errors
-                if "Duplicate external_id" in e.message
+                e for e in result.errors if "Duplicate external_id" in e.message
             ]
             self.assertEqual(len(dup_errors), 1)
             self.assertIn("CWE-79", dup_errors[0].message)
@@ -451,10 +461,7 @@ class DuplicateIdValidationTests(SimpleTestCase):
 
             result = validate_pack(pack_dir)
 
-            dup_errors = [
-                e for e in result.errors
-                if "Duplicate" in e.message
-            ]
+            dup_errors = [e for e in result.errors if "Duplicate" in e.message]
             self.assertEqual(len(dup_errors), 0)
 
 
@@ -501,7 +508,8 @@ class OverlaySectionCodeValidationTests(SimpleTestCase):
             result = validate_pack(pack_dir)
 
             section_errors = [
-                e for e in result.errors
+                e
+                for e in result.errors
                 if "section_code" in e.message and "BOGUS" in e.message
             ]
             self.assertEqual(len(section_errors), 1)
@@ -534,15 +542,13 @@ class OverlaySectionCodeValidationTests(SimpleTestCase):
             result = validate_pack(pack_dir)
 
             fw_warnings = [
-                w for w in result.warnings
+                w
+                for w in result.warnings
                 if "nonexistent-fw" in w.message and "not found" in w.message
             ]
             self.assertEqual(len(fw_warnings), 1)
             # Should NOT be an error
-            fw_errors = [
-                e for e in result.errors
-                if "nonexistent-fw" in e.message
-            ]
+            fw_errors = [e for e in result.errors if "nonexistent-fw" in e.message]
             self.assertEqual(len(fw_errors), 0)
 
 
@@ -568,14 +574,17 @@ class DependsOnValidationTests(SimpleTestCase):
             mock_get_libraries_path.return_value = base
 
             pack_dir = _write_pack(
-                base, "dep-pack", slug="dep-pack",
+                base,
+                "dep-pack",
+                slug="dep-pack",
                 depends_on=["nonexistent-dep"],
             )
 
             result = validate_pack(pack_dir)
 
             dep_warnings = [
-                w for w in result.warnings
+                w
+                for w in result.warnings
                 if "nonexistent-dep" in w.message and "depends_on" in w.field
             ]
             self.assertEqual(len(dep_warnings), 1)
@@ -597,14 +606,17 @@ class DependsOnValidationTests(SimpleTestCase):
             _write_pack(base, "stride-taxonomy", slug="stride-taxonomy")
 
             pack_dir = _write_pack(
-                base, "dep-pack", slug="dep-pack",
+                base,
+                "dep-pack",
+                slug="dep-pack",
                 depends_on=["stride-taxonomy"],
             )
 
             result = validate_pack(pack_dir)
 
             dep_warnings = [
-                w for w in result.warnings
+                w
+                for w in result.warnings
                 if "stride-taxonomy" in w.message and "depends_on" in w.field
             ]
             self.assertEqual(len(dep_warnings), 0)
@@ -624,16 +636,15 @@ class DependsOnValidationTests(SimpleTestCase):
             mock_get_libraries_path.return_value = base
 
             pack_dir = _write_pack(
-                base, "dep-pack", slug="dep-pack",
+                base,
+                "dep-pack",
+                slug="dep-pack",
                 depends_on=["ghost-pack"],
             )
 
             result = validate_pack(pack_dir)
 
-            dep_errors = [
-                e for e in result.errors
-                if "ghost-pack" in e.message
-            ]
+            dep_errors = [e for e in result.errors if "ghost-pack" in e.message]
             self.assertEqual(len(dep_errors), 0)
 
     @mock.patch("apps.packs.services.ExternalTaxonomy")
@@ -654,14 +665,17 @@ class DependsOnValidationTests(SimpleTestCase):
             _write_pack(base, "taxonomies/stride-taxonomy", slug="stride-taxonomy")
 
             pack_dir = _write_pack(
-                base, "dep-pack", slug="dep-pack",
+                base,
+                "dep-pack",
+                slug="dep-pack",
                 depends_on=["taxonomies/stride-taxonomy"],
             )
 
             result = validate_pack(pack_dir)
 
             dep_warnings = [
-                w for w in result.warnings
+                w
+                for w in result.warnings
                 if "stride-taxonomy" in w.message and "depends_on" in w.field
             ]
             self.assertEqual(len(dep_warnings), 0)
@@ -702,7 +716,8 @@ class SlugFormatValidationTests(SimpleTestCase):
             result = validate_pack(pack_dir)
 
             slug_warnings = [
-                w for w in result.warnings
+                w
+                for w in result.warnings
                 if "Bad_Pack" in w.message and "slug" in w.field
             ]
             self.assertEqual(len(slug_warnings), 1)
@@ -726,7 +741,8 @@ class SlugFormatValidationTests(SimpleTestCase):
             result = validate_pack(pack_dir)
 
             slug_warnings = [
-                w for w in result.warnings
+                w
+                for w in result.warnings
                 if "aws_lambda" in w.message and "slug format" in w.message
             ]
             self.assertEqual(len(slug_warnings), 1)
@@ -749,10 +765,7 @@ class SlugFormatValidationTests(SimpleTestCase):
 
             result = validate_pack(pack_dir)
 
-            slug_warnings = [
-                w for w in result.warnings
-                if "slug format" in w.message
-            ]
+            slug_warnings = [w for w in result.warnings if "slug format" in w.message]
             self.assertEqual(len(slug_warnings), 0)
 
 
@@ -798,3 +811,31 @@ class ImportResultWarningsTests(SimpleTestCase):
         )
         self.assertEqual(result.warnings, [])
         self.assertEqual(result.to_dict()["warnings"], [])
+
+
+class GetLibrariesPathTests(SimpleTestCase):
+    """The pack sources come from settings.LIBRARIES_PATH and nowhere else.
+
+    The path used to be guessed from BASE_DIR with a fallback, which found nothing
+    under a container that mounts the directory elsewhere. Every catalog then came
+    up empty and looked like an unseeded database.
+    """
+
+    @override_settings(LIBRARIES_PATH="/mounted/elsewhere")
+    def test_reads_the_configured_location(self):
+        self.assertEqual(get_libraries_path(), Path("/mounted/elsewhere/packs"))
+
+    @override_settings(LIBRARIES_PATH=Path("/mounted/elsewhere"))
+    def test_accepts_a_path_as_well_as_a_string(self):
+        self.assertEqual(get_libraries_path(), Path("/mounted/elsewhere/packs"))
+
+    @override_settings(LIBRARIES_PATH="/nowhere/at/all")
+    def test_does_not_fall_back_when_the_location_is_missing(self):
+        """A configured path that does not exist is returned, not searched around.
+
+        Callers report the path they were given, which is the only thing that tells
+        an operator which mount is wrong.
+        """
+        libraries_path = get_libraries_path()
+        self.assertFalse(libraries_path.exists())
+        self.assertEqual(libraries_path, Path("/nowhere/at/all/packs"))

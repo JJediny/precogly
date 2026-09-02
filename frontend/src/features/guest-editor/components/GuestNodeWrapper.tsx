@@ -9,6 +9,7 @@ import { HumanActorNode } from '@/features/dfd-editor/components/nodes/HumanActo
 import { SystemActorNode } from '@/features/dfd-editor/components/nodes/SystemActorNode'
 import { TrustZoneNode } from '@/features/dfd-editor/components/nodes/TrustZoneNode'
 import { SystemScopeNode } from '@/features/dfd-editor/components/nodes/SystemScopeNode'
+import { StickyNoteNode } from '@/features/dfd-editor/components/nodes/StickyNoteNode'
 import { DataFlowEdge as DataFlowEdgeComponent } from '@/features/dfd-editor/components/edges/DataFlowEdge'
 import { TrustBoundaryEdge as TrustBoundaryEdgeComponent } from '@/features/dfd-editor/components/edges/TrustBoundaryEdge'
 
@@ -47,6 +48,7 @@ export const guestNodeTypes = {
   systemActor: withThreatBadge(SystemActorNode),
   trustZone: withThreatBadge(TrustZoneNode),
   systemScope: withThreatBadge(SystemScopeNode),
+  stickyNote: StickyNoteNode,
 } as const
 
 // Edge wrapper that adds a threat count badge

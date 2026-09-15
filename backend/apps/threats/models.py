@@ -678,7 +678,7 @@ class CountermeasureThreatLink(TimestampedModel):
     class Meta:
         constraints = [
             models.CheckConstraint(
-                check=(
+                condition=(
                     models.Q(component_threat__isnull=False, flow_threat__isnull=True)
                     | models.Q(component_threat__isnull=True, flow_threat__isnull=False)
                 ),
@@ -1059,7 +1059,7 @@ class ThreatPersonaLink(TimestampedModel):
     class Meta:
         constraints = [
             models.CheckConstraint(
-                check=(
+                condition=(
                     models.Q(component_threat__isnull=False, flow_threat__isnull=True)
                     | models.Q(component_threat__isnull=True, flow_threat__isnull=False)
                 ),
@@ -1127,7 +1127,7 @@ class ThreatSourceLink(TimestampedModel):
     class Meta:
         constraints = [
             models.CheckConstraint(
-                check=(
+                condition=(
                     models.Q(component_threat__isnull=False, flow_threat__isnull=True)
                     | models.Q(component_threat__isnull=True, flow_threat__isnull=False)
                 ),
@@ -1182,7 +1182,7 @@ class InstanceThreatTaxonomyEntry(TimestampedModel):
     class Meta:
         constraints = [
             models.CheckConstraint(
-                check=(
+                condition=(
                     models.Q(component_threat__isnull=False, flow_threat__isnull=True)
                     | models.Q(component_threat__isnull=True, flow_threat__isnull=False)
                 ),
@@ -1286,7 +1286,7 @@ class RiskThreat(TimestampedModel):
     class Meta:
         constraints = [
             models.CheckConstraint(
-                check=(
+                condition=(
                     models.Q(component_threat__isnull=False, flow_threat__isnull=True)
                     | models.Q(component_threat__isnull=True, flow_threat__isnull=False)
                 ),

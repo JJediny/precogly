@@ -161,7 +161,7 @@ class Migration(migrations.Migration):
         migrations.AddConstraint(
             model_name="countermeasurethreatlink",
             constraint=models.CheckConstraint(
-                check=(
+                condition=(
                     models.Q(component_threat__isnull=False, flow_threat__isnull=True)
                     | models.Q(component_threat__isnull=True, flow_threat__isnull=False)
                 ),

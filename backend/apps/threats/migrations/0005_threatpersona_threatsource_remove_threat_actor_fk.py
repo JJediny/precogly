@@ -183,7 +183,7 @@ class Migration(migrations.Migration):
         migrations.AddConstraint(
             model_name="threatpersonalink",
             constraint=models.CheckConstraint(
-                check=models.Q(
+                condition=models.Q(
                     ("component_threat__isnull", False),
                     ("flow_threat__isnull", True),
                 )
@@ -279,7 +279,7 @@ class Migration(migrations.Migration):
         migrations.AddConstraint(
             model_name="threatsourcelink",
             constraint=models.CheckConstraint(
-                check=models.Q(
+                condition=models.Q(
                     ("component_threat__isnull", False),
                     ("flow_threat__isnull", True),
                 )

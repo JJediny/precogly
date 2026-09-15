@@ -49,10 +49,7 @@ def _compute_drift_for_countermeasure(instance_mappings, library_standards):
     }
 
     # Build lookup: requirement_id -> sufficiency for library standards
-    library_by_req = {
-        ls.requirement_id: ls.sufficiency
-        for ls in library_standards
-    }
+    library_by_req = {ls.requirement_id: ls.sufficiency for ls in library_standards}
 
     additions = 0
     removals = 0
@@ -88,7 +85,22 @@ def check_compliance_drift(threat_model):
 
     for cm in countermeasures:
         instance_mappings = cm.instance_standard_mappings.all()
-        library_standards = cm.countermeasure_library.standard_mappings.all()
+        # NAVE PATCH (precogly/precogly#338): `standard_mappings` is
+        # prefetched (see _get_non_orphaned_countermeasures()), so filter
+        # in Python rather than with .exclude() -- adding a queryset filter
+        # here would bypass the prefetch cache and re-query per
+        # countermeasure. Orphaned rows (requirement=None, left behind by
+        # a renamed/typo'd section_code on reimport instead of being
+        # CASCADE-deleted -- see apps/compliance/models.py) aren't real
+        # drift candidates and must be excluded, not just null-guarded:
+        # left in, `requirement_id=None` would be treated as a distinct
+        # "requirement" both compute functions key their lookups by,
+        # producing a phantom addition/removal for every orphaned row.
+        library_standards = [
+            ls
+            for ls in cm.countermeasure_library.standard_mappings.all()
+            if ls.requirement_id is not None
+        ]
         additions, removals, updates = _compute_drift_for_countermeasure(
             instance_mappings, library_standards
         )
@@ -114,9 +126,20 @@ def _sync_instance_standards(countermeasure):
     Sync a single countermeasure's instance standards with its library source.
     Returns (added, removed, updated) counts.
     """
-    library_standards = CountermeasureLibraryStandard.objects.filter(
-        countermeasure_library=countermeasure.countermeasure_library,
-    ).select_related("requirement", "requirement__framework")
+    # NAVE PATCH (precogly/precogly#338): exclude orphaned mappings
+    # (requirement=None, left behind by a renamed/typo'd section_code on
+    # reimport instead of being CASCADE-deleted -- see apps/compliance/
+    # models.py). A fresh queryset here (unlike _compute_drift_for_
+    # countermeasure's prefetched one above), so filtering at the DB is
+    # fine. Without this, `ls.requirement.section_code` etc. below would
+    # raise AttributeError on the first orphaned row.
+    library_standards = (
+        CountermeasureLibraryStandard.objects.filter(
+            countermeasure_library=countermeasure.countermeasure_library,
+        )
+        .exclude(requirement__isnull=True)
+        .select_related("requirement", "requirement__framework")
+    )
 
     instance_mappings = countermeasure.instance_standard_mappings.all()
 
@@ -126,10 +149,7 @@ def _sync_instance_standards(countermeasure):
         for mapping in instance_mappings
         if mapping.requirement_id is not None
     }
-    library_by_req = {
-        ls.requirement_id: ls
-        for ls in library_standards
-    }
+    library_by_req = {ls.requirement_id: ls for ls in library_standards}
 
     added = 0
     removed = 0
@@ -157,7 +177,9 @@ def _sync_instance_standards(countermeasure):
             updated += 1
 
     if to_create:
-        InstanceCountermeasureStandard.objects.bulk_create(to_create, ignore_conflicts=True)
+        InstanceCountermeasureStandard.objects.bulk_create(
+            to_create, ignore_conflicts=True
+        )
         added = len(to_create)
 
     # Remove mappings no longer in library

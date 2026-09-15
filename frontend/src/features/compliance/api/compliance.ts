@@ -104,7 +104,7 @@ export function useInstanceMappings(countermeasureId: number | null) {
     queryKey: complianceKeys.instanceMappings(countermeasureId!),
     queryFn: async () => {
       const response = await api.get<{ results: InstanceCountermeasureStandard[] } | InstanceCountermeasureStandard[]>(
-        `/countermeasure-standards/?countermeasure=${countermeasureId}`
+        `/instance-countermeasure-standards/?countermeasure=${countermeasureId}`
       )
       return Array.isArray(response) ? response : response.results
     },
@@ -125,7 +125,7 @@ export function useCreateInstanceMapping() {
       requirement: number
       sufficiency: 'full' | 'partial'
     }) =>
-      api.post<InstanceCountermeasureStandard>('/countermeasure-standards/', {
+      api.post<InstanceCountermeasureStandard>('/instance-countermeasure-standards/', {
         countermeasure: data.countermeasure,
         requirement: data.requirement,
         sufficiency: data.sufficiency,
@@ -150,7 +150,7 @@ export function useUpdateInstanceMapping() {
       id: number
       sufficiency: 'full' | 'partial'
     }) =>
-      api.patch<InstanceCountermeasureStandard>(`/countermeasure-standards/${data.id}/`, {
+      api.patch<InstanceCountermeasureStandard>(`/instance-countermeasure-standards/${data.id}/`, {
         sufficiency: data.sufficiency,
       }),
     onSuccess: () => {
@@ -167,7 +167,7 @@ export function useDeleteInstanceMapping() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (id: number) => api.delete(`/countermeasure-standards/${id}/`),
+    mutationFn: (id: number) => api.delete(`/instance-countermeasure-standards/${id}/`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: complianceKeys.all })
       queryClient.invalidateQueries({ queryKey: ['threat-model-threats'] })

@@ -1,4 +1,5 @@
 import type { ReportData, ReportThreat } from '../types/report'
+import { formatTaxonomyEntryLabel } from '@/types/domain'
 
 function downloadCsv(filename: string, headers: string[], rows: string[][]): void {
   const csvContent = [
@@ -39,6 +40,7 @@ export function exportThreatsCSV(data: ReportData, modelName: string): void {
     'Threat Name',
     'Description',
     'STRIDE Category',
+    'Classifications',
     'Inherent Severity',
     'Residual Severity',
     'Status',
@@ -48,6 +50,7 @@ export function exportThreatsCSV(data: ReportData, modelName: string): void {
     threat.threatName,
     threat.threatDescription,
     threat.strideCategory ?? '',
+    (threat.taxonomyEntries ?? []).map(e => formatTaxonomyEntryLabel(e)).join('; '),
     threat.inherentSeverity,
     threat.residualSeverity,
     threat.status,
@@ -62,6 +65,7 @@ export function exportCountermeasuresCSV(data: ReportData, modelName: string): v
     'Control Type',
     'Status',
     'Priority',
+    'Compliance Standards',
     'Assigned Owner',
     'Inherited',
     'Inherited From',
@@ -73,9 +77,10 @@ export function exportCountermeasuresCSV(data: ReportData, modelName: string): v
     for (const cm of threat.countermeasures) {
       rows.push([
         cm.countermeasureName,
-        cm.controlType,
+        (cm.controlFunctions || []).join(', '),
         cm.status,
         cm.priority,
+        (cm.complianceStandards ?? []).map(s => `${s.frameworkName} ${s.sectionCode}`).join('; '),
         cm.assignedOwnerEmail ?? '',
         cm.isInherited ? 'Yes' : 'No',
         cm.inheritedFromComponentName ?? cm.inheritedFromZoneName ?? '',

@@ -7,6 +7,7 @@ from .models import (
     DataFlowInstanceThreat,
     ExternalTaxonomy,
     InstanceCountermeasure,
+    InstanceThreatTaxonomyEntry,
     PentestFinding,
     Risk,
     RiskThreat,
@@ -30,32 +31,55 @@ class ThreatLibraryAdmin(admin.ModelAdmin):
 
 @admin.register(ComponentLibraryThreat)
 class ComponentLibraryThreatAdmin(admin.ModelAdmin):
-    list_display = ["component_library", "threat_library", "default_severity", "applies_to"]
+    list_display = [
+        "component_library",
+        "threat_library",
+        "default_severity",
+        "applies_to",
+    ]
     list_filter = ["applies_to", "default_severity"]
 
 
 @admin.register(CountermeasureLibrary)
 class CountermeasureLibraryAdmin(admin.ModelAdmin):
-    list_display = ["name", "control_type", "cost"]
-    list_filter = ["control_type", "cost"]
+    list_display = ["name", "control_nature", "cost"]
+    list_filter = ["control_nature", "cost"]
     search_fields = ["name", "description"]
 
 
 @admin.register(ComponentInstanceThreat)
 class ComponentInstanceThreatAdmin(admin.ModelAdmin):
-    list_display = ["component", "threat_name", "threat_library", "status", "inherent_severity", "residual_severity"]
+    list_display = [
+        "component",
+        "threat_name",
+        "threat_library",
+        "status",
+        "inherent_severity",
+        "residual_severity",
+    ]
     list_filter = ["status", "inherent_severity"]
 
 
 @admin.register(DataFlowInstanceThreat)
 class DataFlowInstanceThreatAdmin(admin.ModelAdmin):
-    list_display = ["data_flow", "threat_name", "threat_library", "status", "inherent_severity"]
+    list_display = [
+        "data_flow",
+        "threat_name",
+        "threat_library",
+        "status",
+        "inherent_severity",
+    ]
     list_filter = ["status", "inherent_severity"]
 
 
 @admin.register(InstanceCountermeasure)
 class InstanceCountermeasureAdmin(admin.ModelAdmin):
-    list_display = ["threat_model", "countermeasure_library", "status", "assigned_owner"]
+    list_display = [
+        "threat_model",
+        "countermeasure_library",
+        "status",
+        "assigned_owner",
+    ]
     list_filter = ["status", "required_for_release"]
 
 
@@ -86,7 +110,12 @@ class ThreatLibraryTaxonomyEntryAdmin(admin.ModelAdmin):
 
 @admin.register(PentestFinding)
 class PentestFindingAdmin(admin.ModelAdmin):
-    list_display = ["finding_description", "severity", "reconciliation_status", "threat_model"]
+    list_display = [
+        "finding_description",
+        "severity",
+        "reconciliation_status",
+        "threat_model",
+    ]
     list_filter = ["reconciliation_status", "severity"]
 
 
@@ -105,7 +134,13 @@ class RiskThreatAdmin(admin.ModelAdmin):
 
 @admin.register(ThreatPersona)
 class ThreatPersonaAdmin(admin.ModelAdmin):
-    list_display = ["name", "symbolic_name", "threat_model", "is_person", "malicious_intent"]
+    list_display = [
+        "name",
+        "symbolic_name",
+        "threat_model",
+        "is_person",
+        "malicious_intent",
+    ]
     list_filter = ["is_person", "malicious_intent"]
     search_fields = ["name", "symbolic_name"]
 
@@ -124,3 +159,9 @@ class ThreatSourceAdmin(admin.ModelAdmin):
 @admin.register(ThreatSourceLink)
 class ThreatSourceLinkAdmin(admin.ModelAdmin):
     list_display = ["source", "component_threat", "flow_threat"]
+
+
+@admin.register(InstanceThreatTaxonomyEntry)
+class InstanceThreatTaxonomyEntryAdmin(admin.ModelAdmin):
+    list_display = ["taxonomy_entry", "component_threat", "flow_threat"]
+    list_filter = ["taxonomy_entry__taxonomy"]

@@ -2,19 +2,22 @@
  * API hooks for fetching component library (technologies) from installed packs.
  */
 
+import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api, getAccessToken } from '@/lib/api'
 import type { Technology, TechnologyCategory } from '../lib/technology-registry'
+import type { DiagramNodeType } from '@/types/domain'
 
 // Backend response type (camelCase from djangorestframework-camel-case middleware)
-interface ComponentLibraryItem {
+export interface ComponentLibraryItem {
   id: number
   slug: string
   qualifiedSlug: string | null
   name: string
-  category: 'process' | 'datastore' | 'external_human_actor' | 'external_system_actor'  // Node type category
-  componentType: string  // Technology category (database, compute, etc.)
+  category: 'process' | 'datastore' | 'external_human_actor' | 'external_system_actor'
+  componentType: string
   provider: string
+  iconSvg: string | null
   sourcePack: number | null
   sourcePackName: string | null
   sourcePackSlug: string | null
@@ -76,6 +79,7 @@ function transformToTechnology(item: ComponentLibraryItem): Technology {
     category: mapComponentTypeToCategory(item.componentType),
     vendor: mapProviderToVendor(item.provider),
     description: item.sourcePackName ? `From ${item.sourcePackName}` : undefined,
+    icon: item.iconSvg || undefined,
   }
 }
 
@@ -127,4 +131,69 @@ export function useTechnologyDisplayName(value: string | undefined): string {
     (t) => t.id === value || t.name.toLowerCase() === value.toLowerCase()
   )
   return match?.name ?? value
+}
+
+export function useTechnologyInfo(slug: string | undefined): { displayName: string; iconSvg: string | null } {
+  const hasAuth = !!getAccessToken()
+  const { technologies } = useTechnologies(undefined, { enabled: hasAuth })
+
+  if (!slug) return { displayName: '', iconSvg: null }
+
+  const match = technologies.find(
+    (t) => t.id === slug || t.name.toLowerCase() === slug.toLowerCase()
+  )
+  return {
+    displayName: match?.name ?? slug,
+    iconSvg: match?.icon ?? null,
+  }
+}
+
+const categoryToNodeTypeMap: Record<ComponentLibraryItem['category'], DiagramNodeType> = {
+  process: 'process',
+  datastore: 'datastore',
+  external_human_actor: 'humanActor',
+  external_system_actor: 'systemActor',
+}
+
+export function categoryToNodeType(category: ComponentLibraryItem['category']): DiagramNodeType {
+  return categoryToNodeTypeMap[category]
+}
+
+export interface ComponentPanelGroup {
+  packName: string
+  packSlug: string
+  components: ComponentLibraryItem[]
+}
+
+export function useGroupedComponentLibrary(threatModelId?: string) {
+  const { data: items, isLoading } = useQuery({
+    queryKey: ['component-library-grouped', threatModelId],
+    queryFn: async () => {
+      const params = threatModelId ? `?threat_model=${threatModelId}` : ''
+      return api.get<ComponentLibraryItem[]>(`/component-library/${params}`)
+    },
+    staleTime: 5 * 60 * 1000,
+  })
+
+  const groups = useMemo(() => {
+    if (!items) return []
+
+    const groupMap = new Map<string, ComponentPanelGroup>()
+
+    for (const item of items) {
+      const key = item.sourcePackSlug || '__no_pack__'
+      if (!groupMap.has(key)) {
+        groupMap.set(key, {
+          packName: item.sourcePackName || 'Custom',
+          packSlug: key,
+          components: [],
+        })
+      }
+      groupMap.get(key)!.components.push(item)
+    }
+
+    return Array.from(groupMap.values())
+  }, [items])
+
+  return { groups, isLoading }
 }

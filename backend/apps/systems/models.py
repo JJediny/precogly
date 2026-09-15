@@ -226,6 +226,7 @@ class ComponentLibrary(TimestampedModel):
     category = models.CharField(max_length=30, choices=Category.choices)
     component_type = models.CharField(max_length=100)
     provider = models.CharField(max_length=100, blank=True)
+    icon_svg = models.TextField(blank=True, default="")
 
     # Customization tracking (for update vs fork handling)
     customization_status = models.CharField(

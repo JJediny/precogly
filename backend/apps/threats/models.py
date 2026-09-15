@@ -241,7 +241,17 @@ class CountermeasureLibrary(TimestampedModel):
     )
     name = models.CharField(max_length=255)
     description = models.TextField()
-    control_type = models.CharField(max_length=50, default="preventive")
+    control_functions = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="List of control functions, e.g. ['preventive', 'detective']",
+    )
+    control_nature = models.CharField(
+        max_length=20,
+        blank=True,
+        default="",
+        help_text="Control nature: technical, administrative, or physical",
+    )
     default_status = models.CharField(
         max_length=20,
         choices=[("gap", "Gap"), ("platform", "Platform")],
@@ -318,6 +328,19 @@ class ThreatAccessLevel(models.TextChoices):
     PHYSICAL = "physical", "Physical"
 
 
+class TriageStatus(models.TextChoices):
+    """Threat triage decision status."""
+
+    OPEN = "open", "Open"
+    ACCEPT = "accept", "Accept"
+    MITIGATE = "mitigate", "Mitigate"
+    DELEGATE = "delegate", "Delegate"
+    ELIMINATE = "eliminate", "Eliminate"
+
+
+ACTIVE_TRIAGE_STATUSES = (TriageStatus.OPEN, TriageStatus.MITIGATE)
+
+
 class ComponentInstanceThreat(TimestampedModel):
     """Threat instance for a specific component."""
 
@@ -360,15 +383,16 @@ class ComponentInstanceThreat(TimestampedModel):
     )
     severity_scoring_metadata = models.JSONField(default=dict, blank=True)
 
-    # Dismiss functionality
-    is_dismissed = models.BooleanField(
-        default=False,
-        help_text="Dismissed threats are hidden from active view but preserved for audit",
+    # Triage decision
+    triage_status = models.CharField(
+        max_length=20,
+        choices=TriageStatus.choices,
+        default=TriageStatus.OPEN,
     )
-    dismissal_reason = models.TextField(
+    decision_rationale = models.TextField(
         blank=True,
         default="",
-        help_text="Reason for dismissing the threat",
+        help_text="Rationale for triage decision (recommended for accept/delegate/eliminate)",
     )
 
     format_metadata = models.JSONField(default=dict, blank=True)
@@ -466,15 +490,16 @@ class DataFlowInstanceThreat(TimestampedModel):
     )
     severity_scoring_metadata = models.JSONField(default=dict, blank=True)
 
-    # Dismiss functionality
-    is_dismissed = models.BooleanField(
-        default=False,
-        help_text="Dismissed threats are hidden from active view but preserved for audit",
+    # Triage decision
+    triage_status = models.CharField(
+        max_length=20,
+        choices=TriageStatus.choices,
+        default=TriageStatus.OPEN,
     )
-    dismissal_reason = models.TextField(
+    decision_rationale = models.TextField(
         blank=True,
         default="",
-        help_text="Reason for dismissing the threat",
+        help_text="Rationale for triage decision (recommended for accept/delegate/eliminate)",
     )
 
     format_metadata = models.JSONField(default=dict, blank=True)
@@ -586,10 +611,16 @@ class InstanceCountermeasure(TimestampedModel):
         blank=True,
         help_text="Copied from CountermeasureLibrary.description on creation",
     )
-    control_type = models.CharField(
-        max_length=50,
+    control_functions = models.JSONField(
+        default=list,
         blank=True,
-        help_text="Copied from CountermeasureLibrary.control_type on creation",
+        help_text="Copied from CountermeasureLibrary.control_functions on creation",
+    )
+    control_nature = models.CharField(
+        max_length=20,
+        blank=True,
+        default="",
+        help_text="Copied from CountermeasureLibrary.control_nature on creation",
     )
     effectiveness = models.FloatField(
         null=True,
@@ -1117,6 +1148,61 @@ class ThreatSourceLink(TimestampedModel):
     def __str__(self):
         threat = self.component_threat or self.flow_threat
         return f"{self.source.name} -> {threat}"
+
+
+class InstanceThreatTaxonomyEntry(TimestampedModel):
+    """Instance-level taxonomy entry for a threat instance (dual-FK pattern).
+
+    Supplements library-level taxonomy associations (ThreatLibraryTaxonomyEntry)
+    with user-added entries on individual threat instances.
+    """
+
+    tenancy = Tenancy.TENANT_OWNED
+
+    taxonomy_entry = models.ForeignKey(
+        TaxonomyEntry,
+        on_delete=models.CASCADE,
+        related_name="instance_threat_links",
+    )
+    component_threat = models.ForeignKey(
+        ComponentInstanceThreat,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="instance_taxonomy_links",
+    )
+    flow_threat = models.ForeignKey(
+        DataFlowInstanceThreat,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="instance_taxonomy_links",
+    )
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                check=(
+                    models.Q(component_threat__isnull=False, flow_threat__isnull=True)
+                    | models.Q(component_threat__isnull=True, flow_threat__isnull=False)
+                ),
+                name="taxonomy_link_exactly_one_fk",
+            ),
+            models.UniqueConstraint(
+                fields=["taxonomy_entry", "component_threat"],
+                condition=models.Q(component_threat__isnull=False),
+                name="unique_taxonomy_component_threat",
+            ),
+            models.UniqueConstraint(
+                fields=["taxonomy_entry", "flow_threat"],
+                condition=models.Q(flow_threat__isnull=False),
+                name="unique_taxonomy_flow_threat",
+            ),
+        ]
+
+    def __str__(self):
+        threat = self.component_threat or self.flow_threat
+        return f"{self.taxonomy_entry} -> {threat}"
 
 
 class RiskResponse(TimestampedModel):

@@ -1,5 +1,6 @@
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { TaxonomyBadges } from '@/components/shared/TaxonomyBadges'
 import type { ReportThreatAnalysis } from '@/features/reports/types/report'
 import { ReportSection } from '../ReportSection'
 
@@ -52,7 +53,7 @@ export function ThreatAnalysisSection({ threatAnalysis }: ThreatAnalysisSectionP
               <TableHeader>
                 <TableRow>
                   <TableHead>Threat</TableHead>
-                  <TableHead>STRIDE</TableHead>
+                  <TableHead>Classifications</TableHead>
                   <TableHead>Severity</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Countermeasures</TableHead>
@@ -67,7 +68,9 @@ export function ThreatAnalysisSection({ threatAnalysis }: ThreatAnalysisSectionP
                         {threat.threatDescription}
                       </div>
                     </TableCell>
-                    <TableCell className="text-xs">{threat.strideCategory || '—'}</TableCell>
+                    <TableCell>
+                      <TaxonomyBadges entries={threat.taxonomyEntries} maxVisible={3} size="sm" />
+                    </TableCell>
                     <TableCell>
                       <Badge className={SEVERITY_COLORS[threat.residualSeverity] || ''} variant="outline">
                         {threat.residualSeverity}
@@ -81,13 +84,19 @@ export function ThreatAnalysisSection({ threatAnalysis }: ThreatAnalysisSectionP
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
                         {threat.countermeasures.map((cm) => (
-                          <Badge
-                            key={cm.id}
-                            variant="outline"
-                            className={`text-xs ${CM_STATUS_COLORS[cm.status] || ''}`}
-                          >
-                            {cm.countermeasureName}: {cm.status}
-                          </Badge>
+                          <div key={cm.id} className="flex flex-col">
+                            <Badge
+                              variant="outline"
+                              className={`text-xs ${CM_STATUS_COLORS[cm.status] || ''}`}
+                            >
+                              {cm.countermeasureName}: {cm.status}
+                            </Badge>
+                            {cm.complianceStandards && cm.complianceStandards.length > 0 && (
+                              <span className="text-[10px] text-muted-foreground ml-1">
+                                {cm.complianceStandards.map(s => `${s.frameworkName} ${s.sectionCode}`).join(', ')}
+                              </span>
+                            )}
+                          </div>
                         ))}
                       </div>
                     </TableCell>
@@ -106,7 +115,7 @@ export function ThreatAnalysisSection({ threatAnalysis }: ThreatAnalysisSectionP
               <TableHeader>
                 <TableRow>
                   <TableHead>Threat</TableHead>
-                  <TableHead>STRIDE</TableHead>
+                  <TableHead>Classifications</TableHead>
                   <TableHead>Severity</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Countermeasures</TableHead>
@@ -118,7 +127,9 @@ export function ThreatAnalysisSection({ threatAnalysis }: ThreatAnalysisSectionP
                     <TableCell>
                       <div className="font-medium text-sm">{threat.threatName}</div>
                     </TableCell>
-                    <TableCell className="text-xs">{threat.strideCategory || '—'}</TableCell>
+                    <TableCell>
+                      <TaxonomyBadges entries={threat.taxonomyEntries} maxVisible={3} size="sm" />
+                    </TableCell>
                     <TableCell>
                       <Badge className={SEVERITY_COLORS[threat.residualSeverity] || ''} variant="outline">
                         {threat.residualSeverity}
@@ -132,13 +143,19 @@ export function ThreatAnalysisSection({ threatAnalysis }: ThreatAnalysisSectionP
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
                         {threat.countermeasures.map((cm) => (
-                          <Badge
-                            key={cm.id}
-                            variant="outline"
-                            className={`text-xs ${CM_STATUS_COLORS[cm.status] || ''}`}
-                          >
-                            {cm.countermeasureName}: {cm.status}
-                          </Badge>
+                          <div key={cm.id} className="flex flex-col">
+                            <Badge
+                              variant="outline"
+                              className={`text-xs ${CM_STATUS_COLORS[cm.status] || ''}`}
+                            >
+                              {cm.countermeasureName}: {cm.status}
+                            </Badge>
+                            {cm.complianceStandards && cm.complianceStandards.length > 0 && (
+                              <span className="text-[10px] text-muted-foreground ml-1">
+                                {cm.complianceStandards.map(s => `${s.frameworkName} ${s.sectionCode}`).join(', ')}
+                              </span>
+                            )}
+                          </div>
                         ))}
                       </div>
                     </TableCell>

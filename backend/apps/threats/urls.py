@@ -14,6 +14,7 @@ from .views import (
     ExternalTaxonomyViewSet,
     InstanceCountermeasureStandardViewSet,
     InstanceCountermeasureViewSet,
+    InstanceThreatTaxonomyEntryViewSet,
     PentestFindingViewSet,
     RiskViewSet,
     ScoringMethodsView,
@@ -62,15 +63,21 @@ router.register(
     basename="pentest-finding",
 )
 router.register(
-    r"countermeasure-standards",
+    r"instance-countermeasure-standards",
     InstanceCountermeasureStandardViewSet,
-    basename="countermeasure-standard",
+    basename="instance-countermeasure-standard",
 )
 
 router.register(
     r"countermeasure-comments",
     CountermeasureCommentViewSet,
     basename="countermeasure-comment",
+)
+
+router.register(
+    r"threat-taxonomy-entries",
+    InstanceThreatTaxonomyEntryViewSet,
+    basename="threat-taxonomy-entry",
 )
 
 router.register(r"taxonomies", ExternalTaxonomyViewSet, basename="taxonomy")

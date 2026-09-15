@@ -1,4 +1,5 @@
 import type { SecurityStandard, TaxonomyEntry } from '@/types/domain'
+import { isActiveThreat, type TriageStatus } from '@/types/triage'
 
 /**
  * Compliance standard mapping from backend.
@@ -18,7 +19,7 @@ export interface ComplianceStandardMapping {
 /**
  * Status of a countermeasure for a specific component-threat
  */
-export type CountermeasureStatus = 'platform' | 'gap' | 'planned' | 'verified' | 'waived'
+export type CountermeasureStatus = 'platform' | 'gap' | 'planned' | 'in_progress' | 'implemented' | 'verified' | 'waived' | 'decommissioned'
 
 export const COUNTERMEASURE_STATUS_CONFIG: Record<
   CountermeasureStatus,
@@ -54,6 +55,24 @@ export const COUNTERMEASURE_STATUS_CONFIG: Record<
     bgColor: 'bg-blue-500',
     description: 'Risk accepted, not implementing',
   },
+  in_progress: {
+    label: 'In Progress',
+    color: '#eab308', // yellow
+    bgColor: 'bg-yellow-500',
+    description: 'Implementation actively underway',
+  },
+  implemented: {
+    label: 'Implemented',
+    color: '#10b981', // teal-green, distinct from verified
+    bgColor: 'bg-emerald-500',
+    description: 'Implemented, not yet independently verified by the security team',
+  },
+  decommissioned: {
+    label: 'Decommissioned',
+    color: '#6b7280', // gray
+    bgColor: 'bg-gray-400',
+    description: 'Control formally retired, no longer tracked as active',
+  },
 }
 
 /**
@@ -87,7 +106,7 @@ export const THREAT_STATUS_CONFIG: Record<
 
 /**
  * A countermeasure instance for a specific component-threat pair
- * Includes countermeasure metadata from backend (name, controlType)
+ * Includes countermeasure metadata from backend (name, controlFunctions, controlNature)
  */
 export interface ComponentThreatCountermeasure {
   id: string
@@ -110,7 +129,8 @@ export interface ComponentThreatCountermeasure {
   // Countermeasure metadata from backend (eliminates need for frontend registry lookup)
   countermeasureName?: string
   countermeasureDescription?: string
-  controlType?: string
+  controlFunctions?: string[]
+  controlNature?: string
   // Compliance standard mappings from backend
   standardMappings?: ComplianceStandardMapping[]
   // Priority level
@@ -150,10 +170,10 @@ export interface ComponentThreat {
   componentId: string
   // Reference to threat definition (e.g., "lib-123")
   threatId: string
-  // Whether this threat was dismissed/hidden
-  dismissed: boolean
-  // Reason for dismissal (if dismissed)
-  dismissalReason?: string
+  // Triage status for this threat
+  triageStatus: TriageStatus
+  // Rationale for triage decision
+  decisionRationale?: string
   // Custom notes
   notes?: string
   // Countermeasures for this component-threat
@@ -220,9 +240,11 @@ export function deriveThreatStatus(countermeasures: ComponentThreatCountermeasur
 
   const hasPlanned = countermeasures.some((cm) => cm.status === 'planned')
   const hasWaived = countermeasures.some((cm) => cm.status === 'waived')
-  if (hasPlanned || hasWaived) return 'addressable'
+  const hasInProgress = countermeasures.some((cm) => cm.status === 'in_progress')
+  if (hasPlanned || hasWaived || hasInProgress) return 'addressable'
 
-  // All are 'platform' or 'verified' (no gaps, no planned, no waived)
+  // All are 'platform', 'verified', 'implemented', or 'decommissioned'
+  // (no gaps, no planned, no waived, no in_progress)
   return 'mitigated'
 }
 
@@ -236,7 +258,7 @@ export function summarizeComponentThreats(
   technology: string | undefined,
   threats: ComponentThreat[]
 ): ComponentThreatSummary {
-  const componentThreats = threats.filter((t) => t.componentId === componentId && !t.dismissed)
+  const componentThreats = threats.filter((t) => t.componentId === componentId && isActiveThreat(t.triageStatus))
 
   let exposed = 0
   let addressable = 0
@@ -276,7 +298,7 @@ export interface ExpandedComponentThreat {
   taxonomyEntries?: TaxonomyEntry[]
   // Status derived from countermeasures
   status: ThreatStatus
-  dismissed: boolean
+  triageStatus: TriageStatus
   notes?: string
   // Expanded countermeasures
   countermeasures: ExpandedCountermeasure[]

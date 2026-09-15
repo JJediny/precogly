@@ -118,10 +118,17 @@ export interface ReportDataFlow {
   hasSensitiveData: boolean
 }
 
+export interface ReportComplianceStandard {
+  frameworkName: string
+  sectionCode: string
+  sufficiency: string
+}
+
 export interface ReportCountermeasure {
   id: number
   countermeasureName: string
-  controlType: string
+  controlFunctions: string[]
+  controlNature: string
   status: string
   priority: string
   assignedOwnerEmail: string | null
@@ -130,6 +137,7 @@ export interface ReportCountermeasure {
   isInherited: boolean
   inheritedFromComponentName: string | null
   inheritedFromZoneName: string | null
+  complianceStandards?: ReportComplianceStandard[]
 }
 
 export interface ReportThreatTaxonomyEntry {
@@ -151,20 +159,21 @@ export interface ReportThreat {
   countermeasures: ReportCountermeasure[]
 }
 
-export interface ReportDismissedThreat {
+export interface ReportTriagedThreat {
   id: number
   type: 'component' | 'dataflow'
   threatName: string
   componentName?: string
   flowLabel?: string
-  dismissalReason: string
+  triageStatus: string
+  decisionRationale: string
 }
 
 export interface ReportThreatAnalysis {
   strideSummary: Record<string, number>
   componentThreats: Record<string, ReportThreat[]>
   dataFlowThreats: Record<string, ReportThreat[]>
-  dismissedThreats: ReportDismissedThreat[]
+  triagedThreats: ReportTriagedThreat[]
 }
 
 export interface ReportGap {
@@ -241,7 +250,7 @@ export interface ReportCompliance {
 
 export interface ReportSummaryMetrics {
   totalActiveThreats: number
-  totalDismissedThreats: number
+  totalTriagedThreats: number
   threatsByStatus: Record<string, number>
   totalCountermeasures: number
   countermeasuresByStatus: Record<string, number>

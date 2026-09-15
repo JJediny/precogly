@@ -7,6 +7,7 @@ import {
   ImageRun,
 } from 'docx'
 import type { ReportData, ReportThreat } from '../types/report'
+import { formatTaxonomyEntryLabel } from '@/types/domain'
 import {
   h1,
   h2,
@@ -94,7 +95,7 @@ function buildSummarySection(data: ReportData): (Paragraph | Table)[] {
       ['Metric', 'Count'],
       [
         ['Total Active Threats', String(s.totalActiveThreats)],
-        ['Total Dismissed Threats', String(s.totalDismissedThreats)],
+        ['Total Triaged Threats', String(s.totalTriagedThreats)],
         ['Total Countermeasures', String(s.totalCountermeasures)],
         ['Open Gaps', String(s.totalGaps)],
         ['Waived Countermeasures', String(s.totalWaived)],
@@ -345,9 +346,9 @@ function buildThreatAnalysisSection(data: ReportData): (Paragraph | Table)[] {
           para(`This section documents ${allThreats.length} identified threats across all system components and data flows.`),
           spacer(),
           buildTable(
-            [3240, 2160, 960, 960, 960, 1080],
-            ['Threat Name', 'Component / Data Flow', 'STRIDE', 'Inherent Severity', 'Status', 'CMs'],
-            allThreats.map(({ threat, context }) => [threat.threatName, context, threat.strideCategory ?? '—', threat.inherentSeverity, threat.status, String(threat.countermeasures.length)]),
+            [2640, 1800, 1800, 960, 960, 1200],
+            ['Threat Name', 'Component / Data Flow', 'Classifications', 'Inherent Severity', 'Status', 'CMs'],
+            allThreats.map(({ threat, context }) => [threat.threatName, context, (threat.taxonomyEntries ?? []).map(e => formatTaxonomyEntryLabel(e)).join(', ') || '—', threat.inherentSeverity, threat.status, String(threat.countermeasures.length)]),
           ) as Paragraph | Table,
         ]
       : [para('No active threats defined.') as Paragraph | Table]),
@@ -370,18 +371,18 @@ function buildStrideSummarySection(data: ReportData): (Paragraph | Table)[] {
   ]
 }
 
-function buildDismissedThreatsSection(data: ReportData): (Paragraph | Table)[] {
-  const dismissed = data.threatAnalysis.dismissedThreats
+function buildTriagedThreatsSection(data: ReportData): (Paragraph | Table)[] {
+  const triaged = data.threatAnalysis.triagedThreats
   return [
-    h1('9. Dismissed Threats'),
+    h1('9. Triaged Threats'),
     spacer(),
-    ...(dismissed.length > 0
+    ...(triaged.length > 0
       ? [buildTable(
-          [3240, 2880, 3240],
-          ['Threat Name', 'Component / Data Flow', 'Dismissal Reason'],
-          dismissed.map((t) => [t.threatName, t.componentName ?? t.flowLabel ?? '—', t.dismissalReason]),
+          [2400, 2160, 1800, 2880],
+          ['Threat Name', 'Component / Data Flow', 'Triage Status', 'Decision Rationale'],
+          triaged.map((t) => [t.threatName, t.componentName ?? t.flowLabel ?? '—', t.triageStatus, t.decisionRationale]),
         ) as Paragraph | Table]
-      : [para('No dismissed threats.') as Paragraph | Table]),
+      : [para('No triaged threats.') as Paragraph | Table]),
     spacer(),
   ]
 }
@@ -455,14 +456,15 @@ function buildCountermeasuresSection(data: ReportData): (Paragraph | Table)[] {
 
   for (const { threat, context } of allThreats) {
     for (const cm of threat.countermeasures) {
+      const standards = (cm.complianceStandards ?? [])
+        .map(s => `${s.frameworkName} ${s.sectionCode}`)
+        .join(', ') || '—'
       rows.push([
         cm.countermeasureName,
-        cm.controlType,
+        (cm.controlFunctions || []).join(', '),
         cm.status,
         cm.priority,
-        cm.isInherited
-          ? `Yes — ${cm.inheritedFromComponentName ?? cm.inheritedFromZoneName ?? ''}`
-          : 'No',
+        standards,
         threat.threatName,
         context,
       ])
@@ -474,8 +476,8 @@ function buildCountermeasuresSection(data: ReportData): (Paragraph | Table)[] {
     spacer(),
     ...(rows.length > 0
       ? [buildTable(
-          [2160, 1080, 900, 780, 1440, 1440, 1560],
-          ['Countermeasure', 'Control Type', 'Status', 'Priority', 'Inherited', 'Associated Threat', 'Component'],
+          [1800, 960, 780, 720, 1800, 1440, 1860],
+          ['Countermeasure', 'Control Type', 'Status', 'Priority', 'Compliance', 'Associated Threat', 'Component'],
           rows,
         ) as Paragraph | Table]
       : [para('No countermeasures defined.') as Paragraph | Table]),
@@ -667,7 +669,7 @@ export async function exportWordDoc(
     pageBreak(),
     ...buildThreatAnalysisSection(data),
     pageBreak(),
-    ...buildDismissedThreatsSection(data),
+    ...buildTriagedThreatsSection(data),
     pageBreak(),
     ...buildCountermeasureStatusSection(data),
     pageBreak(),

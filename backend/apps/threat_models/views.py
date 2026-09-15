@@ -3,6 +3,7 @@ Views for threat_models app.
 """
 
 import json
+import logging
 
 from django.db import transaction
 from django.db.models import Q
@@ -10,6 +11,7 @@ from django.http import JsonResponse
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -30,6 +32,8 @@ from .serializers import (
     ThreatModelReferenceImageUploadSerializer,
     ThreatModelSerializer,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class ThreatModelViewSet(viewsets.ModelViewSet):
@@ -441,57 +445,62 @@ class ThreatModelViewSet(viewsets.ModelViewSet):
     def _serialize_taxonomy_entries(self, threat_instance):
         """Serialize taxonomy entries for a threat instance.
 
-        Uses live data from threat_library when available, falls back to
-        taxonomy_snapshot when the library link has been removed.
+        Merges library-level and instance-level entries, deduplicating by
+        (taxonomy_slug, external_id). Falls back to taxonomy_snapshot when
+        no live entries exist.
         """
+        seen = {}
+
         if threat_instance.threat_library:
-            entries = []
             for join in threat_instance.threat_library.taxonomy_entries.select_related(
                 "taxonomy_entry__taxonomy"
             ).all():
                 entry = join.taxonomy_entry
-                entries.append(
-                    {
-                        "taxonomy_slug": entry.taxonomy.slug,
-                        "taxonomy_name": entry.taxonomy.name,
-                        "external_id": entry.external_id,
-                        "title": entry.title,
-                        "reference_url": entry.reference_url,
-                    }
-                )
-            return entries
-        return threat_instance.taxonomy_snapshot
+                key = (entry.taxonomy.slug, entry.external_id)
+                seen[key] = {
+                    "taxonomy_slug": entry.taxonomy.slug,
+                    "taxonomy_name": entry.taxonomy.name,
+                    "external_id": entry.external_id,
+                    "title": entry.title,
+                    "reference_url": entry.reference_url,
+                    "source": "library",
+                }
+
+        for link in threat_instance.instance_taxonomy_links.select_related(
+            "taxonomy_entry__taxonomy"
+        ).all():
+            entry = link.taxonomy_entry
+            key = (entry.taxonomy.slug, entry.external_id)
+            if key not in seen:
+                seen[key] = {
+                    "taxonomy_slug": entry.taxonomy.slug,
+                    "taxonomy_name": entry.taxonomy.name,
+                    "external_id": entry.external_id,
+                    "title": entry.title,
+                    "reference_url": entry.reference_url,
+                    "source": "instance",
+                }
+
+        if not seen:
+            return threat_instance.taxonomy_snapshot
+
+        return list(seen.values())
 
     def _serialize_standard_mappings(self, countermeasure_instance):
         """Serialize standard mappings for a countermeasure instance.
 
-        Uses library-level mappings when the library link exists, falls back to
-        instance-level mappings with snapshot data when it doesn't.
+        Merges library-level and instance-level mappings. Instance mappings
+        override library mappings for the same requirement.
         """
+        seen = {}
+
         if countermeasure_instance.countermeasure_library:
-            mappings = []
             for (
                 mapping
             ) in countermeasure_instance.countermeasure_library.standard_mappings.all():
                 if mapping.requirement and mapping.requirement.framework:
-                    mappings.append(
-                        {
-                            "id": mapping.id,
-                            "framework_name": mapping.requirement.framework.name,
-                            "framework_slug": mapping.requirement.framework.slug,
-                            "section_code": mapping.requirement.section_code,
-                            "requirement_description": mapping.requirement.description,
-                            "sufficiency": mapping.sufficiency,
-                        }
-                    )
-            return mappings
-
-        # Fallback: use instance-level standard mappings with snapshot data
-        mappings = []
-        for mapping in countermeasure_instance.instance_standard_mappings.all():
-            if mapping.requirement and mapping.requirement.framework:
-                mappings.append(
-                    {
+                    req_id = mapping.requirement_id
+                    seen[req_id] = {
                         "id": mapping.id,
                         "framework_name": mapping.requirement.framework.name,
                         "framework_slug": mapping.requirement.framework.slug,
@@ -499,20 +508,29 @@ class ThreatModelViewSet(viewsets.ModelViewSet):
                         "requirement_description": mapping.requirement.description,
                         "sufficiency": mapping.sufficiency,
                     }
-                )
+
+        for mapping in countermeasure_instance.instance_standard_mappings.all():
+            if mapping.requirement and mapping.requirement.framework:
+                req_id = mapping.requirement_id
+                seen[req_id] = {
+                    "id": mapping.id,
+                    "framework_name": mapping.requirement.framework.name,
+                    "framework_slug": mapping.requirement.framework.slug,
+                    "section_code": mapping.requirement.section_code,
+                    "requirement_description": mapping.requirement.description,
+                    "sufficiency": mapping.sufficiency,
+                }
             else:
-                # Requirement was deleted — use snapshot fields
-                mappings.append(
-                    {
-                        "id": mapping.id,
-                        "framework_name": mapping.framework_name,
-                        "framework_slug": "",
-                        "section_code": mapping.section_code,
-                        "requirement_description": mapping.requirement_description,
-                        "sufficiency": mapping.sufficiency,
-                    }
-                )
-        return mappings
+                seen[f"snapshot_{mapping.id}"] = {
+                    "id": mapping.id,
+                    "framework_name": mapping.framework_name,
+                    "framework_slug": "",
+                    "section_code": mapping.section_code,
+                    "requirement_description": mapping.requirement_description,
+                    "sufficiency": mapping.sufficiency,
+                }
+
+        return list(seen.values())
 
     def _serialize_countermeasures_from_links(self, links, current_threat):
         """Serialize countermeasures from junction table links, including also_mitigates."""
@@ -583,12 +601,18 @@ class ThreatModelViewSet(viewsets.ModelViewSet):
                         else None
                     )
                     or cm.countermeasure_name,
-                    "control_type": (
-                        cm.countermeasure_library.control_type
+                    "control_functions": (
+                        cm.countermeasure_library.control_functions
                         if cm.countermeasure_library
                         else None
                     )
-                    or cm.control_type,
+                    or cm.control_functions,
+                    "control_nature": (
+                        cm.countermeasure_library.control_nature
+                        if cm.countermeasure_library
+                        else None
+                    )
+                    or cm.control_nature,
                     "status": cm.status,
                     "priority": cm.priority,
                     "due_date": cm.due_date,
@@ -798,6 +822,7 @@ class ThreatModelViewSet(viewsets.ModelViewSet):
             .select_related("component", "threat_library")
             .prefetch_related(
                 "threat_library__taxonomy_entries__taxonomy_entry__taxonomy",
+                "instance_taxonomy_links__taxonomy_entry__taxonomy",
                 countermeasure_links_prefetch,
             )
         )
@@ -813,6 +838,7 @@ class ThreatModelViewSet(viewsets.ModelViewSet):
             )
             .prefetch_related(
                 "threat_library__taxonomy_entries__taxonomy_entry__taxonomy",
+                "instance_taxonomy_links__taxonomy_entry__taxonomy",
                 countermeasure_links_prefetch,
             )
         )
@@ -836,21 +862,19 @@ class ThreatModelViewSet(viewsets.ModelViewSet):
                 "dfd_id": node_info["dfd_id"] if node_info else None,
                 "dfd_name": node_info["dfd_name"] if node_info else None,
                 "threat_library_id": threat.threat_library_id,
-                "threat_name": (
-                    threat.threat_library.name if threat.threat_library else None
-                )
-                or threat.threat_name,
-                "threat_description": (
+                "threat_name": threat.threat_name
+                or (threat.threat_library.name if threat.threat_library else None),
+                "threat_description": threat.threat_description
+                or (
                     threat.threat_library.description if threat.threat_library else None
-                )
-                or threat.threat_description,
+                ),
                 "taxonomy_entries": self._serialize_taxonomy_entries(threat),
                 "inherent_severity": threat.inherent_severity,
                 "residual_severity": threat.residual_severity,
                 "status": threat.status,
                 "severity_scoring_metadata": threat.severity_scoring_metadata,
-                "is_dismissed": threat.is_dismissed,
-                "dismissal_reason": threat.dismissal_reason,
+                "triage_status": threat.triage_status,
+                "decision_rationale": threat.decision_rationale,
                 "display_order": threat.display_order,
                 "impact_description": threat.impact_description,
                 "threat_actor_text": threat.threat_actor_text,
@@ -891,21 +915,19 @@ class ThreatModelViewSet(viewsets.ModelViewSet):
                 "dfd_id": edge_info["dfd_id"] if edge_info else None,
                 "dfd_name": edge_info["dfd_name"] if edge_info else None,
                 "threat_library_id": threat.threat_library_id,
-                "threat_name": (
-                    threat.threat_library.name if threat.threat_library else None
-                )
-                or threat.threat_name,
-                "threat_description": (
+                "threat_name": threat.threat_name
+                or (threat.threat_library.name if threat.threat_library else None),
+                "threat_description": threat.threat_description
+                or (
                     threat.threat_library.description if threat.threat_library else None
-                )
-                or threat.threat_description,
+                ),
                 "taxonomy_entries": self._serialize_taxonomy_entries(threat),
                 "inherent_severity": threat.inherent_severity,
                 "residual_severity": threat.residual_severity,
                 "status": threat.status,
                 "severity_scoring_metadata": threat.severity_scoring_metadata,
-                "is_dismissed": threat.is_dismissed,
-                "dismissal_reason": threat.dismissal_reason,
+                "triage_status": threat.triage_status,
+                "decision_rationale": threat.decision_rationale,
                 "display_order": threat.display_order,
                 "impact_description": threat.impact_description,
                 "threat_actor_text": threat.threat_actor_text,
@@ -1000,9 +1022,14 @@ class ThreatModelViewSet(viewsets.ModelViewSet):
             uploaded_file = request.FILES["file"]
             try:
                 json_data = json.loads(uploaded_file.read().decode("utf-8"))
-            except (json.JSONDecodeError, UnicodeDecodeError) as e:
+            except (json.JSONDecodeError, UnicodeDecodeError):
                 return Response(
-                    {"detail": f"Invalid JSON file: {e}"},
+                    {
+                        "detail": (
+                            "Could not parse the uploaded file as JSON. "
+                            "Check that it is a valid JSON file and try again."
+                        ),
+                    },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
         elif request.content_type and "json" in request.content_type:
@@ -1020,10 +1047,28 @@ class ThreatModelViewSet(viewsets.ModelViewSet):
             threat_model, summary = adapter.import_data(
                 json_data, organization, request.user
             )
-        except Exception as e:
+        except ValidationError as e:
+            detail = str(e)
+            if hasattr(e, "detail"):
+                detail = (
+                    e.detail.get("detail", str(e.detail))
+                    if isinstance(e.detail, dict)
+                    else str(e.detail)
+                )
             return Response(
-                {"detail": str(e)},
+                {"detail": detail},
                 status=status.HTTP_400_BAD_REQUEST,
+            )
+        except Exception:
+            logger.exception("Unexpected error during TM-Library import")
+            return Response(
+                {
+                    "detail": (
+                        "An unexpected error occurred during import. "
+                        "This is likely a bug. Please try again or contact support."
+                    ),
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
         return Response(
@@ -1078,9 +1123,14 @@ class ThreatModelViewSet(viewsets.ModelViewSet):
             uploaded_file = request.FILES["file"]
             try:
                 json_data = json.loads(uploaded_file.read().decode("utf-8"))
-            except (json.JSONDecodeError, UnicodeDecodeError) as e:
+            except (json.JSONDecodeError, UnicodeDecodeError):
                 return Response(
-                    {"detail": f"Invalid JSON file: {e}"},
+                    {
+                        "detail": (
+                            "Could not parse the uploaded file as JSON. "
+                            "Check that it is a valid JSON file and try again."
+                        ),
+                    },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
         elif request.content_type and "json" in request.content_type:
@@ -1093,15 +1143,35 @@ class ThreatModelViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        from .adapters.cyclonedx import TmBomImportError
+
         adapter = CycloneDxAdapter()
         try:
             threat_model, summary = adapter.import_data(
                 json_data, organization, request.user
             )
-        except Exception as e:
+        except (TmBomImportError, ValidationError) as e:
+            detail = str(e)
+            if hasattr(e, "detail"):
+                detail = (
+                    e.detail.get("detail", str(e.detail))
+                    if isinstance(e.detail, dict)
+                    else str(e.detail)
+                )
             return Response(
-                {"detail": str(e)},
+                {"detail": detail},
                 status=status.HTTP_400_BAD_REQUEST,
+            )
+        except Exception:
+            logger.exception("Unexpected error during CycloneDX import")
+            return Response(
+                {
+                    "detail": (
+                        "An unexpected error occurred during import. "
+                        "This is likely a bug. Please try again or contact support."
+                    ),
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
         return Response(
@@ -1129,7 +1199,7 @@ class ThreatModelViewSet(viewsets.ModelViewSet):
         response = JsonResponse(export_data, json_dumps_params={"indent": 2})
         safe_name = re.sub(r"[^a-z0-9\-]", "-", threat_model.name.lower())
         safe_name = re.sub(r"-{2,}", "-", safe_name).strip("-")
-        filename = f"{safe_name}-cyclonedx-tm-bom.json"
+        filename = f"{safe_name}-cyclonedx-tm-bom.cdx.json"
         response["Content-Disposition"] = f'attachment; filename="{filename}"'
         return response
 

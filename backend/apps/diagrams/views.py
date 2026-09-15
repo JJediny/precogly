@@ -9,7 +9,6 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-
 from apps.ai.providers.base import AIDisabledError, AIProviderError
 from apps.ai.resolver import resolve_config
 from apps.core.permissions import CanWrite
@@ -33,7 +32,11 @@ class DFDViewSet(viewsets.ModelViewSet):
     """ViewSet for DFD CRUD operations."""
 
     permission_classes = [IsAuthenticated, CanWrite]
-    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filter_backends = [
+        DjangoFilterBackend,
+        filters.SearchFilter,
+        filters.OrderingFilter,
+    ]
     filterset_fields = ["diagram_type"]
     search_fields = ["name"]
     ordering_fields = ["name", "created_at", "updated_at"]
@@ -43,7 +46,9 @@ class DFDViewSet(viewsets.ModelViewSet):
         """Get DFDs accessible to the user."""
         user = self.request.user
         # Get organizations the user belongs to
-        org_ids = user.organization_memberships.values_list("organization_id", flat=True)
+        org_ids = user.organization_memberships.values_list(
+            "organization_id", flat=True
+        )
 
         return DFD.objects.filter(
             threat_model__organization_id__in=org_ids
@@ -65,13 +70,19 @@ class DFDViewSet(viewsets.ModelViewSet):
         threat_model_id = request.data.get("threat_model_id")
         if not threat_model_id:
             return Response(
-                {"error": "threat_model_id is required. DFDs cannot be created without a threat model."},
+                {
+                    "error": "threat_model_id is required. DFDs cannot be created without a threat model."
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        try:
-            threat_model = ThreatModel.objects.get(id=threat_model_id)
-        except ThreatModel.DoesNotExist:
+        org_ids = request.user.organization_memberships.values_list(
+            "organization_id", flat=True
+        )
+        threat_model = ThreatModel.objects.filter(
+            id=threat_model_id, organization_id__in=org_ids
+        ).first()
+        if threat_model is None:
             return Response(
                 {"error": "Threat model not found"},
                 status=status.HTTP_404_NOT_FOUND,
@@ -81,14 +92,16 @@ class DFDViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         is_first_dfd = not threat_model.dfds.exists()
-        dfd = serializer.save(
+        serializer.save(
             updated_by=request.user,
             threat_model=threat_model,
             is_primary=is_first_dfd,
         )
 
         headers = self.get_success_headers(serializer.data)
-        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+        return Response(
+            serializer.data, status=status.HTTP_201_CREATED, headers=headers
+        )
 
     def perform_update(self, serializer):
         """Set updated_by to current user and sync nodes to components (primary only)."""
@@ -127,10 +140,12 @@ class DFDViewSet(viewsets.ModelViewSet):
 
         affected_threat_models = []
         if dfd.threat_model:
-            affected_threat_models.append({
-                "id": str(dfd.threat_model.id),
-                "name": dfd.threat_model.name,
-            })
+            affected_threat_models.append(
+                {
+                    "id": str(dfd.threat_model.id),
+                    "name": dfd.threat_model.name,
+                }
+            )
 
         # Extract component IDs from nodes
         component_ids = []
@@ -160,23 +175,29 @@ class DFDViewSet(viewsets.ModelViewSet):
                 ).select_related("component_library")
 
                 for comp in orphaned_comps:
-                    orphaned_components.append({
-                        "id": comp.id,
-                        "name": comp.name,
-                        "library_name": comp.component_library.name if comp.component_library else None,
-                    })
+                    orphaned_components.append(
+                        {
+                            "id": comp.id,
+                            "name": comp.name,
+                            "library_name": comp.component_library.name
+                            if comp.component_library
+                            else None,
+                        }
+                    )
 
-        return Response({
-            "dfd": {
-                "id": str(dfd.id),
-                "name": dfd.name,
-                "node_count": len(nodes),
-                "component_count": len(component_ids),
-            },
-            "affected_threat_models": affected_threat_models,
-            "orphaned_components": orphaned_components,
-            "orphaned_component_count": len(orphaned_components),
-        })
+        return Response(
+            {
+                "dfd": {
+                    "id": str(dfd.id),
+                    "name": dfd.name,
+                    "node_count": len(nodes),
+                    "component_count": len(component_ids),
+                },
+                "affected_threat_models": affected_threat_models,
+                "orphaned_components": orphaned_components,
+                "orphaned_component_count": len(orphaned_components),
+            }
+        )
 
     @action(detail=False, methods=["get"], url_path="ai-availability")
     def ai_availability(self, request):
@@ -233,7 +254,9 @@ class DFDViewSet(viewsets.ModelViewSet):
         # Validate image type and size.
         if image.content_type not in _ACCEPTED_IMAGE_TYPES:
             return Response(
-                {"error": f"Unsupported image type: {image.content_type}. Accepted: JPEG, PNG, WebP."},
+                {
+                    "error": f"Unsupported image type: {image.content_type}. Accepted: JPEG, PNG, WebP."
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
         if image.size > _MAX_IMAGE_SIZE:
@@ -246,9 +269,11 @@ class DFDViewSet(viewsets.ModelViewSet):
         org_ids = request.user.organization_memberships.values_list(
             "organization_id", flat=True
         )
-        threat_model = ThreatModel.objects.filter(
-            id=threat_model_id, organization_id__in=org_ids
-        ).select_related("organization").first()
+        threat_model = (
+            ThreatModel.objects.filter(id=threat_model_id, organization_id__in=org_ids)
+            .select_related("organization")
+            .first()
+        )
         if threat_model is None:
             return Response(
                 {"error": "Threat model not found"},
@@ -267,7 +292,9 @@ class DFDViewSet(viewsets.ModelViewSet):
         except AIDisabledError as err:
             return Response({"error": str(err)}, status=status.HTTP_400_BAD_REQUEST)
         except AIProviderError as err:
-            return Response({"error": str(err)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+            return Response(
+                {"error": str(err)}, status=status.HTTP_503_SERVICE_UNAVAILABLE
+            )
 
         return Response(result)
 
@@ -292,9 +319,11 @@ class DFDViewSet(viewsets.ModelViewSet):
         org_ids = request.user.organization_memberships.values_list(
             "organization_id", flat=True
         )
-        threat_model = ThreatModel.objects.filter(
-            id=threat_model_id, organization_id__in=org_ids
-        ).select_related("organization").first()
+        threat_model = (
+            ThreatModel.objects.filter(id=threat_model_id, organization_id__in=org_ids)
+            .select_related("organization")
+            .first()
+        )
         if threat_model is None:
             return Response(
                 {"error": "Threat model not found"},
@@ -312,7 +341,9 @@ class DFDViewSet(viewsets.ModelViewSet):
         except AIDisabledError as err:
             return Response({"error": str(err)}, status=status.HTTP_400_BAD_REQUEST)
         except AIProviderError as err:
-            return Response({"error": str(err)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+            return Response(
+                {"error": str(err)}, status=status.HTTP_503_SERVICE_UNAVAILABLE
+            )
 
         return Response(canvas_data)
 
@@ -327,7 +358,9 @@ class DFDViewSet(viewsets.ModelViewSet):
         from apps.systems.models import OrgsystemComponent
 
         dfd = self.get_object()
-        delete_orphaned = request.query_params.get("delete_orphaned_components", "").lower() == "true"
+        delete_orphaned = (
+            request.query_params.get("delete_orphaned_components", "").lower() == "true"
+        )
 
         # Capture primary state before deletion for auto-promotion
         was_primary = dfd.is_primary
@@ -371,10 +404,13 @@ class DFDViewSet(viewsets.ModelViewSet):
                 next_dfd.is_primary = True
                 next_dfd.save(update_fields=["is_primary"])
 
-        return Response({
-            "status": "deleted",
-            "orphaned_components_deleted": orphaned_deleted_count,
-        }, status=status.HTTP_200_OK)
+        return Response(
+            {
+                "status": "deleted",
+                "orphaned_components_deleted": orphaned_deleted_count,
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class DFDTemplatesLibraryViewSet(viewsets.ReadOnlyModelViewSet):
@@ -397,8 +433,7 @@ class DFDTemplatesLibraryViewSet(viewsets.ReadOnlyModelViewSet):
                 threat_model_id=threat_model_id
             ).values_list("library_pack_id", flat=True)
             qs = qs.filter(
-                Q(source_pack_id__in=connected_pack_ids)
-                | Q(source_pack__isnull=True)
+                Q(source_pack_id__in=connected_pack_ids) | Q(source_pack__isnull=True)
             )
         return qs
 
@@ -449,32 +484,40 @@ class DFDTemplatesLibraryViewSet(viewsets.ReadOnlyModelViewSet):
                         "component_library_id": component_library.id,
                         "component_library_name": component_library.name,
                     }
-                    resolution_results.append({
-                        "node_id": node.get("id"),
-                        "component_ref": component_ref,
-                        "resolved": True,
-                        "component_library_id": component_library.id,
-                        "component_library_name": component_library.name,
-                    })
+                    resolution_results.append(
+                        {
+                            "node_id": node.get("id"),
+                            "component_ref": component_ref,
+                            "resolved": True,
+                            "component_library_id": component_library.id,
+                            "component_library_name": component_library.name,
+                        }
+                    )
                 else:
-                    resolution_results.append({
-                        "node_id": node.get("id"),
-                        "component_ref": component_ref,
-                        "resolved": False,
-                        "error": f"Component not found: {component_ref}",
-                    })
+                    resolution_results.append(
+                        {
+                            "node_id": node.get("id"),
+                            "component_ref": component_ref,
+                            "resolved": False,
+                            "error": f"Component not found: {component_ref}",
+                        }
+                    )
 
             resolved_data["nodes"].append(resolved_node)
 
-        return Response({
-            "id": template.id,
-            "name": template.name,
-            "description": template.description,
-            "category": template.category,
-            "diagramType": template.diagram_type,
-            "canvasData": resolved_data,
-            "sourcePackId": source_pack.id if source_pack else None,
-            "sourcePackName": source_pack.name if source_pack else None,
-            "resolutionResults": resolution_results,
-            "allResolved": all(r.get("resolved", False) for r in resolution_results if r),
-        })
+        return Response(
+            {
+                "id": template.id,
+                "name": template.name,
+                "description": template.description,
+                "category": template.category,
+                "diagramType": template.diagram_type,
+                "canvasData": resolved_data,
+                "sourcePackId": source_pack.id if source_pack else None,
+                "sourcePackName": source_pack.name if source_pack else None,
+                "resolutionResults": resolution_results,
+                "allResolved": all(
+                    r.get("resolved", False) for r in resolution_results if r
+                ),
+            }
+        )

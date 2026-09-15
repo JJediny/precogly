@@ -84,7 +84,7 @@ Here's how the YAML maps to what you see in the UI when previewing a pack:
 
 ![Pack preview — Threats with taxonomy tags](../assets/images/library-packs-preview-threats.png)
 
-![Pack preview — Countermeasures with control type and cost](../assets/images/library-packs-preview-countermeasures.png)
+![Pack preview — Countermeasures with control functions, control nature, and cost](../assets/images/library-packs-preview-countermeasures.png)
 
 ![Pack preview — Compliance framework requirements](../assets/images/library-packs-preview-compliance-mappings.png)
 
@@ -121,8 +121,10 @@ countermeasures:
     name: S3 Block Public Access
     description: |
       Enable S3 Block Public Access at account and bucket level.
-    control_type: preventive # preventive | detective | corrective | deterrent | recovery | compensating | procedural
-    cost: low # low | medium | high
+    control_functions:        # list: preventive | detective | corrective | deterrent | recovery | compensating
+      - preventive
+    control_nature: technical # technical | administrative | physical
+    cost: low                 # low | medium | high
 ```
 
 ### Join files

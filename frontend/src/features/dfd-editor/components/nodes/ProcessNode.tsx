@@ -5,7 +5,8 @@ import { cn } from '@/lib/utils'
 import { InlineEditableLabel } from './InlineEditableLabel'
 import type { ProcessNodeData } from '../../types'
 import { DATA_SENSITIVITY_CONFIG } from '../../types'
-import { useTechnologyDisplayName } from '../../api/component-library'
+import { useTechnologyInfo } from '../../api/component-library'
+import { SvgIcon } from '../SvgIcon'
 import { useDFDNotation } from '../../context/DFDNotationContext'
 
 type ProcessNodeType = Node<ProcessNodeData, 'process'>
@@ -41,7 +42,8 @@ export const ProcessNode = memo(function ProcessNode({
   selected,
 }: NodeProps<ProcessNodeType>) {
   const isNewlyInserted = data.isNewlyInserted
-  const technologyDisplayName = useTechnologyDisplayName(data.technology)
+  const technologySlug = data.technology || (data as Record<string, unknown>).componentRef as string | undefined
+  const { displayName: technologyDisplayName, iconSvg: technologyIcon } = useTechnologyInfo(technologySlug)
   const [showLockAnimation, setShowLockAnimation] = useState(false)
   const [showReceiveAnimation, setShowReceiveAnimation] = useState(false)
   const { notationStyle } = useDFDNotation()
@@ -93,26 +95,31 @@ export const ProcessNode = memo(function ProcessNode({
       <ProcessHandles />
       <div
         className={cn(
-          'w-full border-2 transition-all',
-          // Containers stay fixed to the node bounds; leaves grow with wrapped labels like actor nodes
+          'w-full transition-all',
           isContainer ? 'h-full' : 'min-h-full',
           isContainer
             ? cn(
-                'rounded-lg border-solid',
+                'border-2 rounded-lg border-solid',
                 selected ? 'border-blue-500 shadow-md' : 'border-blue-300',
                 showReceiveAnimation && 'animate-lock-pulse ring-2 ring-orange-400 ring-offset-2'
               )
-            : isYourdon
+            : technologyIcon
               ? cn(
-                  'rounded-full bg-blue-50 flex flex-col items-center justify-center',
-                  selected ? 'border-blue-500 shadow-md' : 'border-blue-200',
-                  showLockAnimation && 'animate-lock-pulse ring-2 ring-orange-400 ring-offset-2'
+                  'flex flex-col items-center justify-center p-1',
+                  selected && 'shadow-lg',
+                  showLockAnimation && 'animate-lock-pulse'
                 )
-              : cn(
-                  'rounded-lg px-4 py-3 bg-blue-50 min-w-[120px] flex items-center',
-                  selected ? 'border-blue-500 shadow-md' : 'border-blue-200',
-                  showLockAnimation && 'animate-lock-pulse ring-2 ring-orange-400 ring-offset-2'
-                ),
+              : isYourdon
+                ? cn(
+                    'border-2 rounded-full bg-blue-50 flex flex-col items-center justify-center',
+                    selected ? 'border-blue-500 shadow-md' : 'border-blue-200',
+                    showLockAnimation && 'animate-lock-pulse ring-2 ring-orange-400 ring-offset-2'
+                  )
+                : cn(
+                    'border-2 rounded-lg px-4 py-3 bg-blue-50 min-w-[120px] flex items-center',
+                    selected ? 'border-blue-500 shadow-md' : 'border-blue-200',
+                    showLockAnimation && 'animate-lock-pulse ring-2 ring-orange-400 ring-offset-2'
+                  ),
           isNewlyInserted && 'ring-2 ring-green-400 ring-offset-2'
         )}
         style={isContainer ? { backgroundColor: 'rgba(219, 234, 254, 0.4)' } : undefined}
@@ -121,7 +128,9 @@ export const ProcessNode = memo(function ProcessNode({
           <>
             {/* Label badge at top-left */}
             <div className="absolute -top-3 left-3 px-2 py-0.5 rounded text-xs font-medium bg-blue-500 text-white flex items-center gap-1">
-              <Cog className="h-3 w-3" />
+              {technologyIcon && (
+                <SvgIcon svg={technologyIcon} className="h-3 w-3" />
+              )}
               <InlineEditableLabel
                 nodeId={id}
                 label={data.label}
@@ -146,6 +155,28 @@ export const ProcessNode = memo(function ProcessNode({
               >
                 {DATA_SENSITIVITY_CONFIG[data.dataSensitivity].label}
               </div>
+            )}
+          </>
+        ) : technologyIcon ? (
+          <>
+            <SvgIcon svg={technologyIcon} className="h-10 w-10" />
+            <InlineEditableLabel
+              nodeId={id}
+              label={data.label}
+              isEditing={data.isInlineEditing}
+              className="font-medium text-xs text-gray-900 text-center break-words max-w-[80px] mt-1"
+              inputClassName="max-w-[80px] text-xs text-gray-900 text-center"
+            />
+            {data.dataSensitivity && (
+              <span
+                className="text-[10px] px-1 rounded mt-0.5"
+                style={{
+                  backgroundColor: `${DATA_SENSITIVITY_CONFIG[data.dataSensitivity].color}20`,
+                  color: DATA_SENSITIVITY_CONFIG[data.dataSensitivity].color,
+                }}
+              >
+                {DATA_SENSITIVITY_CONFIG[data.dataSensitivity].label}
+              </span>
             )}
           </>
         ) : isYourdon ? (

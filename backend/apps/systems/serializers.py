@@ -142,6 +142,7 @@ class ComponentLibrarySerializer(serializers.ModelSerializer):
             "category",
             "component_type",
             "provider",
+            "icon_svg",
             "source_pack",
             "source_pack_name",
             "source_pack_slug",
@@ -151,6 +152,7 @@ class ComponentLibrarySerializer(serializers.ModelSerializer):
         read_only_fields = [
             "id",
             "qualified_slug",
+            "icon_svg",
             "created_at",
             "updated_at",
             "source_pack_name",
@@ -292,7 +294,13 @@ class ComponentDataAssetSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "created_at", "updated_at", "component_name", "data_asset_name"]
+        read_only_fields = [
+            "id",
+            "created_at",
+            "updated_at",
+            "component_name",
+            "data_asset_name",
+        ]
 
 
 class DataFlowAssetSerializer(serializers.ModelSerializer):

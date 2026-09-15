@@ -188,8 +188,13 @@ def _cm_payload(ic: InstanceCountermeasure, section_code: str) -> dict:
         "control_type": cdx.get("control_type") or ic.control_nature or "",
     }
     poam_payload = {
-        "poam_id": poam.get("poam_id", ""),
-        "due_date": poam.get("due_date", ""),
+        "poam_id": ic.poam_id or poam.get("poam_id", ""),
+        "due_date": (
+            ic.scheduled_completion.isoformat()
+            if ic.scheduled_completion
+            else poam.get("due_date", "")
+        ),
+        "days_overdue": ic.days_overdue,
     }
 
     return {

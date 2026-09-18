@@ -132,6 +132,25 @@ test('deselecting the table drops the cell selection with it', async ({ page }) 
   expect(await selectedCells(page)).toEqual([])
 })
 
+test('a press on a cell dismisses the context menu, and still selects', async ({ page }) => {
+  await insertTable(page, 3, 3)
+
+  // The menu is drawn down-right of the press and Playwright will not click a
+  // cell it covers, so open at the last cell and dismiss from the first.
+  await cell(page, 2, 2).click()
+  await cell(page, 2, 2).click({ button: 'right' })
+  await expect(page.getByRole('menu')).toBeVisible()
+
+  // Radix dismisses from a `pointerdown` on `document`, so a cell that stops
+  // propagation leaves the menu open. Only a selected table takes the pointer,
+  // which is why the bug needed one: on an unselected table the menu closed.
+  await cell(page, 0, 0).click()
+  await expect(page.getByRole('menu')).toBeHidden()
+
+  // Letting the press through to `document` must not hand it back to React Flow.
+  expect(await selectedCells(page)).toEqual(['0,0'])
+})
+
 test('fills one cell from its context menu', async ({ page }) => {
   await insertTable(page, 3, 3)
 
@@ -458,4 +477,153 @@ test('a whole column of one colour marks that colour', async ({ page }) => {
   await page.getByTitle('Column 1').click({ button: 'right' })
   await page.getByRole('menuitem', { name: 'Fill' }).click()
   await expect(page.getByRole('menuitemradio', { checked: true })).toHaveAccessibleName('Yellow')
+})
+
+/** Select a rectangle by dragging, assuming the table node is already selected. */
+async function dragSelect(page: Page, from: [number, number], to: [number, number]) {
+  const a = (await cell(page, from[0], from[1]).boundingBox())!
+  const b = (await cell(page, to[0], to[1]).boundingBox())!
+  await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 10 })
+  await page.mouse.up()
+}
+
+/**
+ * Run a context-menu entry on a cell, then wait for the menu to finish closing.
+ *
+ * Radix animates the menu out, and until it is detached it still swallows
+ * pointer events — a click on a cell straight afterwards lands on the menu.
+ */
+async function cellMenu(page: Page, row: number, col: number, item: string) {
+  await cell(page, row, col).click({ button: 'right' })
+  await page.getByRole('menuitem', { name: item, exact: true }).click()
+  await expect(page.locator('[data-slot="context-menu-content"]')).toHaveCount(0)
+}
+
+/** How many grid tracks a cell spans, read back off its computed style. */
+const spanOf = (page: Page, row: number, col: number) =>
+  cell(page, row, col).evaluate((el) => {
+    const s = getComputedStyle(el)
+    return { col: s.gridColumnEnd, row: s.gridRowEnd }
+  })
+
+test('merges a selection into one cell that spans its tracks', async ({ page }) => {
+  await insertTable(page, 3, 3)
+  await cell(page, 0, 0).click()
+  await dragSelect(page, [0, 0], [0, 1])
+
+  await cellMenu(page, 0, 0, 'Merge cells')
+
+  expect(await spanOf(page, 0, 0)).toEqual({ col: 'span 2', row: 'span 1' })
+  // The swallowed cell is gone from the DOM, not merely hidden.
+  await expect(cell(page, 0, 1)).toHaveCount(0)
+  await expect(page.locator('[data-table-cell]')).toHaveCount(8)
+})
+
+test('merging keeps the anchor text and discards the rest, undo restores it', async ({ page }) => {
+  await insertTable(page, 3, 3)
+  await cell(page, 0, 0).click()
+
+  await cell(page, 0, 0).dblclick()
+  await page.keyboard.type('Navigation Apps')
+  await page.keyboard.press('Escape')
+  await cell(page, 0, 1).dblclick()
+  await page.keyboard.type('discard me')
+  await page.keyboard.press('Escape')
+
+  await dragSelect(page, [0, 0], [0, 1])
+  await cellMenu(page, 0, 0, 'Merge cells')
+
+  // Excel's rule: the upper-left value survives, the others are deleted.
+  await expect(cell(page, 0, 0)).toContainText('Navigation Apps')
+  await expect(page.locator('[data-table-cell]')).toHaveCount(8)
+
+  // Unlike Excel and Sheets, where the discarded text is gone for good.
+  await page.keyboard.press('Control+z')
+  await expect(page.locator('[data-table-cell]')).toHaveCount(9)
+  await expect(cell(page, 0, 1)).toContainText('discard me')
+})
+
+test('unmerge splits the block back into plain cells', async ({ page }) => {
+  await insertTable(page, 3, 3)
+  await cell(page, 0, 0).click()
+  await dragSelect(page, [0, 0], [1, 1])
+
+  await cellMenu(page, 0, 0, 'Merge cells')
+  expect(await spanOf(page, 0, 0)).toEqual({ col: 'span 2', row: 'span 2' })
+  await expect(page.locator('[data-table-cell]')).toHaveCount(6)
+
+  await cellMenu(page, 0, 0, 'Unmerge cells')
+  expect(await spanOf(page, 0, 0)).toEqual({ col: 'span 1', row: 'span 1' })
+  await expect(page.locator('[data-table-cell]')).toHaveCount(9)
+})
+
+test('the menu entries are disabled when they have nothing to do', async ({ page }) => {
+  await insertTable(page, 3, 3)
+  await cell(page, 1, 1).click()
+  await cell(page, 1, 1).click()
+
+  // One unmerged cell: nothing to merge, nothing to split.
+  await cell(page, 1, 1).click({ button: 'right' })
+  await expect(page.getByRole('menuitem', { name: 'Merge cells', exact: true })).toBeDisabled()
+  await expect(page.getByRole('menuitem', { name: 'Unmerge cells', exact: true })).toBeDisabled()
+  await page.keyboard.press('Escape')
+
+  await dragSelect(page, [1, 1], [1, 2])
+  await cell(page, 1, 1).click({ button: 'right' })
+  await expect(page.getByRole('menuitem', { name: 'Merge cells', exact: true })).toBeEnabled()
+  await expect(page.getByRole('menuitem', { name: 'Unmerge cells', exact: true })).toBeDisabled()
+})
+
+test('an insert through a merge unmerges it', async ({ page }) => {
+  await insertTable(page, 3, 3)
+  await cell(page, 0, 0).click()
+  await dragSelect(page, [0, 0], [0, 1])
+  await cellMenu(page, 0, 0, 'Merge cells')
+  expect(await spanOf(page, 0, 0)).toEqual({ col: 'span 2', row: 'span 1' })
+
+  // Excel would expand the selection to the merge and insert two columns;
+  // Sheets often refuses outright. Splitting the merge is neither.
+  await cell(page, 0, 0).click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Insert column right' }).click()
+
+  await expect(page.locator('[data-table-cell]')).toHaveCount(12)
+  expect(await spanOf(page, 0, 0)).toEqual({ col: 'span 1', row: 'span 1' })
+})
+
+test('an arrow key steps over a merged block rather than into it', async ({ page }) => {
+  await insertTable(page, 3, 3)
+  await cell(page, 0, 0).click()
+  await dragSelect(page, [0, 0], [0, 1])
+  await cellMenu(page, 0, 0, 'Merge cells')
+
+  await cell(page, 0, 0).click()
+  expect(await selectedCells(page)).toEqual(['0,0'])
+
+  // 0,1 is under the merge and renders nothing, so one press has to clear the
+  // whole block rather than land on a cell that is not there.
+  await page.keyboard.press('ArrowRight')
+  expect(await selectedCells(page)).toEqual(['0,2'])
+
+  // Coming back lands on the block, selecting its anchor.
+  await page.keyboard.press('ArrowLeft')
+  expect(await selectedCells(page)).toEqual(['0,0'])
+})
+
+test('a merged cell is clickable through its middle', async ({ page }) => {
+  await insertTable(page, 3, 3)
+  await cell(page, 0, 0).click()
+  await dragSelect(page, [0, 0], [1, 0])
+  await cellMenu(page, 0, 0, 'Merge cells')
+
+  // The centre of a two-row-tall merged cell is exactly where the row divider
+  // between the rows it swallowed used to sit. Its 7px drag strip spans the
+  // whole table, so it took the click and started a resize instead.
+  const box = (await cell(page, 0, 0).boundingBox())!
+  const heightBefore = box.height
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
+
+  expect(await selectedCells(page)).toEqual(['0,0'])
+  expect(Math.round((await cell(page, 0, 0).boundingBox())!.height)).toBe(Math.round(heightBefore))
 })

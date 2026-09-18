@@ -1,6 +1,15 @@
-import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useReactFlow, type Node, type NodeProps } from '@xyflow/react'
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Plus, Trash2 } from 'lucide-react'
+import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  ArrowUp,
+  Plus,
+  TableCellsMerge,
+  TableCellsSplit,
+  Trash2,
+} from 'lucide-react'
 import {
   ContextMenu,
   ContextMenuContent,
@@ -13,6 +22,11 @@ import { useTableDrag } from '../../hooks/useTableDrag'
 import { useTableSelection } from '../../hooks/useTableSelection'
 import {
   commonTableCellFill,
+  mergeTableCells,
+  rangeContainsMerge,
+  rangeCoversSeveralCells,
+  tableCoveredCells,
+  unmergeTableCells,
   insertTableColumn,
   insertTableRow,
   removeTableColumn,
@@ -43,6 +57,33 @@ interface CellRef {
   col: number
 }
 
+/**
+ * Maximal runs of consecutive indices for which `blocked` is false, as
+ * inclusive `[start, end]` pairs.
+ *
+ * Used to break a divider into the stretches it is allowed to occupy. A divider
+ * spans the whole table, so where a merge crosses the boundary it would lie
+ * across the middle of a merged cell and swallow clicks meant for it — a
+ * two-row-tall merged cell has the row divider running through its centre,
+ * which is exactly where a pointer lands.
+ */
+function openRuns(count: number, blocked: (index: number) => boolean): [number, number][] {
+  const runs: [number, number][] = []
+  let start: number | null = null
+
+  for (let i = 0; i < count; i++) {
+    if (blocked(i)) {
+      if (start !== null) runs.push([start, i - 1])
+      start = null
+    } else if (start === null) {
+      start = i
+    }
+  }
+  if (start !== null) runs.push([start, count - 1])
+
+  return runs
+}
+
 /** How far each arrow key steps the cell selection. */
 const ARROW_STEPS: Record<string, { row: number; col: number } | undefined> = {
   ArrowUp: { row: -1, col: 0 },
@@ -70,6 +111,15 @@ export const TableNode = memo(function TableNode({ id, data, selected }: NodePro
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
+  // One pass over the anchors per render rather than a flag on every cell; see
+  // `TableCell`. Memoized because every cell asks it a question, and because the
+  // selection hook holds on to `anchorOf`.
+  const coveredCells = useMemo(() => tableCoveredCells(data.rows), [data.rows])
+  const anchorOf = useCallback(
+    (row: number, col: number) => coveredCells.get(`${row},${col}`) ?? { row, col },
+    [coveredCells]
+  )
+
   // Destructured rather than held as one object: the hook returns a fresh
   // object each render, so a callback depending on the whole thing would be
   // rebuilt every time even though the handlers inside it are stable.
@@ -81,7 +131,7 @@ export const TableNode = memo(function TableNode({ id, data, selected }: NodePro
     selectUnlessInside,
     moveFocus,
     clear: clearSelection,
-  } = useTableSelection(id, data.rows.length, data.columnWidths.length)
+  } = useTableSelection(id, data.rows.length, data.columnWidths.length, anchorOf)
 
   // Sizes come from the drag hook rather than straight from the data: while a
   // divider or corner is being dragged they are its live values, committed to
@@ -156,6 +206,22 @@ export const TableNode = memo(function TableNode({ id, data, selected }: NodePro
             : { ...r, cells: r.cells.map((cell, ci) => (ci !== col ? cell : { ...cell, text })) }
         ),
       }))
+    },
+    [updateData]
+  )
+
+  const mergeCells = useCallback(
+    (range: TableCellRange) => {
+      setEditing(null)
+      updateData((current) => mergeTableCells(current, range))
+    },
+    [updateData]
+  )
+
+  const unmergeCells = useCallback(
+    (range: TableCellRange) => {
+      setEditing(null)
+      updateData((current) => unmergeTableCells(current, range))
     },
     [updateData]
   )
@@ -285,7 +351,20 @@ export const TableNode = memo(function TableNode({ id, data, selected }: NodePro
   const singleRow = data.rows.length <= 1
 
   /** Insert, fill and delete entries for one cell, used by every right-click. */
-  const cellMenuItems = (cell: CellRef) => (
+  const cellMenuItems = (cell: CellRef) => {
+    // What the menu acts on. Right-clicking outside the selection has already
+    // moved it onto the clicked cell, and right-clicking a grip onto that row or
+    // column, so the selection is what was aimed at. The fallback covers a menu
+    // opened before anything is selected, which is the state a table is in until
+    // its first click.
+    const menuRange = selectedRange ?? {
+      top: cell.row,
+      bottom: cell.row,
+      left: cell.col,
+      right: cell.col,
+    }
+
+    return (
     <ContextMenuContent
       className="w-52"
       // Radix hands focus back to the menu's trigger on close, and does it after
@@ -300,27 +379,25 @@ export const TableNode = memo(function TableNode({ id, data, selected }: NodePro
         if (!editing) containerRef.current?.focus()
       }}
     >
-      {/* Fill applies to the whole selection. Right-clicking a cell outside it
-          has already moved the selection onto that cell, and right-clicking a
-          grip onto that row or column, so the selection is always what was
-          aimed at. The fallback covers a menu opened before anything is
-          selected at all, which is the state a table is in until its first
-          click. */}
       <TableFillSubmenu
-        // What the selection already carries, so the picker opens showing it.
-        // Falls back to the right-clicked cell for the same reason the fill
-        // target does: a menu can be opened before anything is selected.
-        current={commonTableCellFill(
-          data.rows,
-          selectedRange ?? { top: cell.row, bottom: cell.row, left: cell.col, right: cell.col }
-        )}
-        onSelect={(fill) =>
-          fillCells(
-            selectedRange ?? { top: cell.row, bottom: cell.row, left: cell.col, right: cell.col },
-            fill
-          )
-        }
+        current={commonTableCellFill(data.rows, menuRange)}
+        onSelect={(fill) => fillCells(menuRange, fill)}
       />
+      <ContextMenuSeparator />
+      <ContextMenuItem
+        disabled={!rangeCoversSeveralCells(data.rows, menuRange)}
+        onSelect={() => mergeCells(menuRange)}
+      >
+        <TableCellsMerge />
+        Merge cells
+      </ContextMenuItem>
+      <ContextMenuItem
+        disabled={!rangeContainsMerge(data.rows, menuRange)}
+        onSelect={() => unmergeCells(menuRange)}
+      >
+        <TableCellsSplit />
+        Unmerge cells
+      </ContextMenuItem>
       <ContextMenuSeparator />
       <ContextMenuItem onSelect={() => insertRow(cell.row)}>
         <ArrowUp />
@@ -357,7 +434,8 @@ export const TableNode = memo(function TableNode({ id, data, selected }: NodePro
         Delete column
       </ContextMenuItem>
     </ContextMenuContent>
-  )
+    )
+  }
 
   // tabIndex on the container makes it a focus target, so that clicking a grip —
   // which focuses a button inside it — lets the Delete keydown bubble up to here.
@@ -386,6 +464,16 @@ export const TableNode = memo(function TableNode({ id, data, selected }: NodePro
       >
         {data.rows.map((row, rowIndex) =>
           row.cells.map((cell, colIndex) => {
+            // A cell under a merge is not rendered at all; the anchor's own box
+            // spans the tracks it would have occupied.
+            if (coveredCells.has(`${rowIndex},${colIndex}`)) return null
+
+            // Clamped because a span that outgrew the grid would otherwise ask
+            // the grid for tracks that do not exist. The structural helpers drop
+            // such spans; this is the backstop.
+            const colSpan = Math.min(cell.colSpan ?? 1, data.columnWidths.length - colIndex)
+            const rowSpan = Math.min(cell.rowSpan ?? 1, data.rows.length - rowIndex)
+
             const isHeader = data.headerRow && rowIndex === 0
             const isEditing = editing?.row === rowIndex && editing.col === colIndex
             const inSelection = selectedRange
@@ -427,14 +515,14 @@ export const TableNode = memo(function TableNode({ id, data, selected }: NodePro
                     // for this cell.
                     style={{
                       fontSize,
-                      gridColumn: colIndex + 1,
-                      gridRow: rowIndex + 1,
+                      gridColumn: `${colIndex + 1} / span ${colSpan}`,
+                      gridRow: `${rowIndex + 1} / span ${rowSpan}`,
                       backgroundColor: cell.fill ? TABLE_FILL_COLORS[cell.fill] : undefined,
                     }}
                     className={cn(
                       'relative flex items-center border-slate-300 px-2 leading-tight text-slate-800',
-                      colIndex < row.cells.length - 1 && 'border-r',
-                      rowIndex < data.rows.length - 1 && 'border-b',
+                      colIndex + colSpan < row.cells.length && 'border-r',
+                      rowIndex + rowSpan < data.rows.length && 'border-b',
                       isHeader && 'font-semibold',
                       isHeader && !cell.fill && 'bg-slate-100',
                       // What actually hands the press to the table rather than
@@ -480,7 +568,11 @@ export const TableNode = memo(function TableNode({ id, data, selected }: NodePro
                           handleCellKeyDown(event, { row: rowIndex, col: colIndex })
                         }
                         onBlur={() => setEditing(null)}
-                        onMouseDown={(event) => event.stopPropagation()}
+                        // No `onMouseDown` stop: `nodrag` below stops the drag and
+                        // no ancestor handles `mousedown`. See `beginCellSelection`
+                        // for what a stop costs — not here, though: opening the
+                        // menu blurs this textarea and unmounts it, so no layer is
+                        // ever open over it.
                         // overflow-hidden so the growing textarea never shows a
                         // scrollbar; its height always matches its content, so
                         // nothing is hidden.
@@ -501,32 +593,42 @@ export const TableNode = memo(function TableNode({ id, data, selected }: NodePro
             across every row (or column), with the hit area straddling that
             track's trailing edge. Placing them in the grid is what lets a row
             grow with its content without the divider drifting off it. */}
-        {columnWidths.map((_, index) => (
-          <div
-            key={`col-divider-${index}`}
-            className="pointer-events-none relative"
-            style={{ gridColumn: index + 1, gridRow: '1 / -1' }}
-          >
+        {columnWidths.flatMap((_, index) =>
+          // The trailing edge of the last column is the table's own, which no
+          // merge can straddle; elsewhere, skip the rows where one does.
+          openRuns(data.rows.length, (row) =>
+            index + 1 < data.columnWidths.length ? anchorOf(row, index + 1).col <= index : false
+          ).map(([from, to]) => (
             <div
-              onPointerDown={(event) => beginResize('column', index, event)}
-              className="nodrag nopan pointer-events-auto absolute inset-y-0 cursor-col-resize"
-              style={{ right: -DIVIDER_HIT / 2, width: DIVIDER_HIT }}
-            />
-          </div>
-        ))}
-        {rowHeights.map((_, index) => (
-          <div
-            key={`row-divider-${index}`}
-            className="pointer-events-none relative"
-            style={{ gridRow: index + 1, gridColumn: '1 / -1' }}
-          >
+              key={`col-divider-${index}-${from}`}
+              className="pointer-events-none relative"
+              style={{ gridColumn: index + 1, gridRow: `${from + 1} / ${to + 2}` }}
+            >
+              <div
+                onPointerDown={(event) => beginResize('column', index, event)}
+                className="nodrag nopan pointer-events-auto absolute inset-y-0 cursor-col-resize"
+                style={{ right: -DIVIDER_HIT / 2, width: DIVIDER_HIT }}
+              />
+            </div>
+          ))
+        )}
+        {rowHeights.map((_, index) =>
+          openRuns(data.columnWidths.length, (col) =>
+            index + 1 < data.rows.length ? anchorOf(index + 1, col).row <= index : false
+          ).map(([from, to]) => (
             <div
-              onPointerDown={(event) => beginResize('row', index, event)}
-              className="nodrag nopan pointer-events-auto absolute inset-x-0 cursor-row-resize"
-              style={{ bottom: -DIVIDER_HIT / 2, height: DIVIDER_HIT }}
-            />
-          </div>
-        ))}
+              key={`row-divider-${index}-${from}`}
+              className="pointer-events-none relative"
+              style={{ gridRow: index + 1, gridColumn: `${from + 1} / ${to + 2}` }}
+            >
+              <div
+                onPointerDown={(event) => beginResize('row', index, event)}
+                className="nodrag nopan pointer-events-auto absolute inset-x-0 cursor-row-resize"
+                style={{ bottom: -DIVIDER_HIT / 2, height: DIVIDER_HIT }}
+              />
+            </div>
+          ))
+        )}
 
         {/* Grips: one bar per column above the table and per row to its left.
             Clicking selects that row or column; right-clicking opens the same

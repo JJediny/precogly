@@ -101,6 +101,19 @@ export interface StickyNoteNodeData extends BaseNodeData {
 export interface TableCell {
   text: string
   fill?: TableCellFill
+  /**
+   * How far a merge anchored here reaches. Absent means one, so an unmerged
+   * cell carries neither field and a diagram saved before merging existed is
+   * already correct.
+   *
+   * The cells a merge swallows stay in `cells`, keeping the grid rectangular so
+   * every index into it still means what it did. They are not flagged: which
+   * cells are covered is derived from the anchors by `tableCoveredCells`,
+   * because a stored flag and the span it mirrors are two things that can
+   * disagree.
+   */
+  colSpan?: number
+  rowSpan?: number
 }
 
 /**
@@ -217,6 +230,35 @@ export const TABLE_DEFAULT_COLUMNS = 3
 export const TABLE_DEFAULT_ROWS = 3
 
 /**
+ * Drop the spans of every merge a structural edit cuts through.
+ *
+ * Inserting or deleting across a merge unmerges it rather than growing or
+ * shrinking it. Neither spreadsheet does anything better: Excel expands the
+ * selection to the merge's full extent, so inserting one row inside a ten-row
+ * merge inserts ten, and Sheets often refuses the insert outright. Both leave
+ * people doing unmerge / edit / re-merge by hand, which is what this does for
+ * them. Undo puts the merge back.
+ *
+ * Checked 2026-09-16 against Microsoft's "Merge and unmerge cells in Excel" and
+ * the reports under learn.microsoft.com/answers/questions/5033930.
+ */
+function unmergeCutBy(
+  rows: TableRow[],
+  isCut: (anchor: { row: number; col: number; rowSpan: number; colSpan: number }) => boolean
+): TableRow[] {
+  return rows.map((row, rowIndex) => ({
+    ...row,
+    cells: row.cells.map((cell, colIndex) => {
+      const rowSpan = cell.rowSpan ?? 1
+      const colSpan = cell.colSpan ?? 1
+      if (rowSpan === 1 && colSpan === 1) return cell
+      if (!isCut({ row: rowIndex, col: colIndex, rowSpan, colSpan })) return cell
+      return withoutSpan(cell)
+    }),
+  }))
+}
+
+/**
  * Set the column count, growing with empty cells or truncating from the right.
  * Truncating discards whatever was in the dropped cells, recoverable through the
  * editor's undo stack, so there is no confirmation.
@@ -230,6 +272,12 @@ export function setTableColumnCount(
 
   if (target === existing) return { columnWidths: current.columnWidths, rows: current.rows }
 
+  // Truncating cuts any merge that reached past the new edge.
+  const kept =
+    target < existing
+      ? unmergeCutBy(current.rows, ({ col, colSpan }) => col + colSpan > target)
+      : current.rows
+
   const columnWidths =
     target < existing
       ? current.columnWidths.slice(0, target)
@@ -238,7 +286,7 @@ export function setTableColumnCount(
           ...Array.from({ length: target - existing }, () => TABLE_DEFAULT_COLUMN_WIDTH),
         ]
 
-  const rows = current.rows.map((row) => ({
+  const rows = kept.map((row) => ({
     ...row,
     cells:
       target < existing
@@ -255,13 +303,14 @@ export function insertTableColumn(
   index: number
 ): Pick<TableNodeData, 'columnWidths' | 'rows'> {
   const at = Math.min(current.columnWidths.length, Math.max(0, index))
+  const kept = unmergeCutBy(current.rows, ({ col, colSpan }) => col < at && at < col + colSpan)
   return {
     columnWidths: [
       ...current.columnWidths.slice(0, at),
       TABLE_DEFAULT_COLUMN_WIDTH,
       ...current.columnWidths.slice(at),
     ],
-    rows: current.rows.map((row) => ({
+    rows: kept.map((row) => ({
       ...row,
       cells: [...row.cells.slice(0, at), { text: '' }, ...row.cells.slice(at)],
     })),
@@ -271,14 +320,15 @@ export function insertTableColumn(
 /** Insert an empty row at `index`, shifting the rest down. */
 export function insertTableRow(current: TableNodeData, index: number): Pick<TableNodeData, 'rows'> {
   const at = Math.min(current.rows.length, Math.max(0, index))
+  const kept = unmergeCutBy(current.rows, ({ row, rowSpan }) => row < at && at < row + rowSpan)
   return {
     rows: [
-      ...current.rows.slice(0, at),
+      ...kept.slice(0, at),
       {
         height: TABLE_DEFAULT_ROW_HEIGHT,
         cells: current.columnWidths.map(() => ({ text: '' })),
       },
-      ...current.rows.slice(at),
+      ...kept.slice(at),
     ],
   }
 }
@@ -291,16 +341,21 @@ export function removeTableColumn(
   if (current.columnWidths.length <= 1) {
     return { columnWidths: current.columnWidths, rows: current.rows }
   }
+  const kept = unmergeCutBy(
+    current.rows,
+    ({ col, colSpan }) => col <= index && index < col + colSpan
+  )
   return {
     columnWidths: current.columnWidths.filter((_, ci) => ci !== index),
-    rows: current.rows.map((row) => ({ ...row, cells: row.cells.filter((_, ci) => ci !== index) })),
+    rows: kept.map((row) => ({ ...row, cells: row.cells.filter((_, ci) => ci !== index) })),
   }
 }
 
 /** Remove one row. A no-op on the last one, which cannot be removed. */
 export function removeTableRow(current: TableNodeData, index: number): Pick<TableNodeData, 'rows'> {
   if (current.rows.length <= 1) return { rows: current.rows }
-  return { rows: current.rows.filter((_, ri) => ri !== index) }
+  const kept = unmergeCutBy(current.rows, ({ row, rowSpan }) => row <= index && index < row + rowSpan)
+  return { rows: kept.filter((_, ri) => ri !== index) }
 }
 
 /**
@@ -316,6 +371,174 @@ export interface TableCellRange {
 
 export function tableRangeContains(range: TableCellRange, row: number, col: number): boolean {
   return row >= range.top && row <= range.bottom && col >= range.left && col <= range.right
+}
+
+/**
+ * The cells hidden under a merge, keyed `"row,col"`, each mapped to the anchor
+ * that covers it.
+ *
+ * Derived rather than stored; see `TableCell`. Rendering only asks whether a
+ * cell is in here; the anchor is what lets an arrow key landing on a covered
+ * cell select the block it belongs to instead of nothing.
+ *
+ * Bounded by the real grid so a span left over from an edit that outgrew it
+ * cannot claim cells that no longer exist — the structural helpers clear such
+ * spans, and this is the backstop if one ever slips through.
+ */
+export function tableCoveredCells(rows: TableRow[]): Map<string, { row: number; col: number }> {
+  const covered = new Map<string, { row: number; col: number }>()
+  const columnCount = rows[0]?.cells.length ?? 0
+
+  rows.forEach((row, rowIndex) => {
+    row.cells.forEach((cell, colIndex) => {
+      const rowSpan = cell.rowSpan ?? 1
+      const colSpan = cell.colSpan ?? 1
+      if (rowSpan === 1 && colSpan === 1) return
+
+      const lastRow = Math.min(rowIndex + rowSpan, rows.length)
+      const lastCol = Math.min(colIndex + colSpan, columnCount)
+      for (let r = rowIndex; r < lastRow; r++) {
+        for (let c = colIndex; c < lastCol; c++) {
+          if (r === rowIndex && c === colIndex) continue
+          covered.set(`${r},${c}`, { row: rowIndex, col: colIndex })
+        }
+      }
+    })
+  })
+
+  return covered
+}
+
+/** A copy of `cell` carrying no merge span. */
+function withoutSpan(cell: TableCell): TableCell {
+  const plain = { ...cell }
+  delete plain.rowSpan
+  delete plain.colSpan
+  return plain
+}
+
+/**
+ * Grow `range` until it contains every merge it touches.
+ *
+ * Merging a range that cuts an existing merge in half would leave an anchor
+ * outside the new block still claiming cells inside it — two anchors covering
+ * one cell, which nothing downstream can render sensibly. Swallowing the whole
+ * merge instead is what Sheets does. Iterated to a fixed point because widening
+ * to absorb one merge can bring the edge up against another.
+ */
+export function expandRangeOverMerges(rows: TableRow[], range: TableCellRange): TableCellRange {
+  let { top, left, bottom, right } = range
+
+  for (let pass = 0; pass < rows.length + 1; pass++) {
+    let grew = false
+
+    rows.forEach((row, rowIndex) => {
+      row.cells.forEach((cell, colIndex) => {
+        const cellBottom = rowIndex + (cell.rowSpan ?? 1) - 1
+        const cellRight = colIndex + (cell.colSpan ?? 1) - 1
+        const intersects =
+          rowIndex <= bottom && cellBottom >= top && colIndex <= right && cellRight >= left
+        if (!intersects) return
+
+        if (rowIndex < top) {
+          top = rowIndex
+          grew = true
+        }
+        if (colIndex < left) {
+          left = colIndex
+          grew = true
+        }
+        if (cellBottom > bottom) {
+          bottom = cellBottom
+          grew = true
+        }
+        if (cellRight > right) {
+          right = cellRight
+          grew = true
+        }
+      })
+    })
+
+    if (!grew) break
+  }
+
+  return { top, left, bottom, right }
+}
+
+/**
+ * Merge `range` into one cell.
+ *
+ * The anchor keeps its text and every other cell in the block is emptied, which
+ * is Excel's and Sheets' rule. Neither warns here, unlike both of them: the
+ * editor has undo, so the text is one keystroke away, and the table already
+ * discards cells without asking when a row or column is removed.
+ */
+export function mergeTableCells(
+  current: TableNodeData,
+  range: TableCellRange
+): Pick<TableNodeData, 'rows'> {
+  const block = expandRangeOverMerges(current.rows, range)
+  const rowSpan = block.bottom - block.top + 1
+  const colSpan = block.right - block.left + 1
+  if (rowSpan === 1 && colSpan === 1) return { rows: current.rows }
+
+  return {
+    rows: current.rows.map((row, rowIndex) => {
+      if (rowIndex < block.top || rowIndex > block.bottom) return row
+      return {
+        ...row,
+        cells: row.cells.map((cell, colIndex) => {
+          if (colIndex < block.left || colIndex > block.right) return cell
+          if (rowIndex === block.top && colIndex === block.left) {
+            return { ...cell, rowSpan, colSpan }
+          }
+          // Swallowed: emptied, and stripped of any span of its own so two
+          // anchors can never claim the same cell.
+          return { ...withoutSpan(cell), text: '' }
+        }),
+      }
+    }),
+  }
+}
+
+/** Split every merge `range` touches back into plain cells. The anchor keeps its text. */
+export function unmergeTableCells(
+  current: TableNodeData,
+  range: TableCellRange
+): Pick<TableNodeData, 'rows'> {
+  const block = expandRangeOverMerges(current.rows, range)
+
+  return {
+    rows: current.rows.map((row, rowIndex) => {
+      if (rowIndex < block.top || rowIndex > block.bottom) return row
+      return {
+        ...row,
+        cells: row.cells.map((cell, colIndex) => {
+          if (colIndex < block.left || colIndex > block.right) return cell
+          if (cell.rowSpan === undefined && cell.colSpan === undefined) return cell
+          return withoutSpan(cell)
+        }),
+      }
+    }),
+  }
+}
+
+/** Whether `range` covers more than one cell once merges are taken into account. */
+export function rangeCoversSeveralCells(rows: TableRow[], range: TableCellRange): boolean {
+  const block = expandRangeOverMerges(rows, range)
+  return block.bottom > block.top || block.right > block.left
+}
+
+/** Whether `range` touches any merge, and so whether there is anything to unmerge. */
+export function rangeContainsMerge(rows: TableRow[], range: TableCellRange): boolean {
+  const block = expandRangeOverMerges(rows, range)
+  for (let r = block.top; r <= block.bottom; r++) {
+    for (let c = block.left; c <= block.right; c++) {
+      const cell = rows[r]?.cells[c]
+      if (cell && ((cell.rowSpan ?? 1) > 1 || (cell.colSpan ?? 1) > 1)) return true
+    }
+  }
+  return false
 }
 
 /**
@@ -394,12 +617,18 @@ export function setTableRowCount(current: TableNodeData, count: number): Pick<Ta
 
   if (target === existing) return { rows: current.rows }
 
+  // Truncating cuts any merge that reached past the new last row.
+  const kept =
+    target < existing
+      ? unmergeCutBy(current.rows, ({ row, rowSpan }) => row + rowSpan > target)
+      : current.rows
+
   return {
     rows:
       target < existing
-        ? current.rows.slice(0, target)
+        ? kept.slice(0, target)
         : [
-            ...current.rows,
+            ...kept,
             ...Array.from({ length: target - existing }, () => ({
               height: TABLE_DEFAULT_ROW_HEIGHT,
               cells: current.columnWidths.map(() => ({ text: '' })),

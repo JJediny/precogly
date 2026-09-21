@@ -84,23 +84,19 @@ skip that confirmation prompt; it does not change what gets deleted.
 The canonical stack lives in `docker-compose.yml` and is shared with Docker,
 which already pins `db.image` to the fully qualified
 `docker.io/library/postgres:16-alpine` reference so rootless Podman never
-prompts for a registry. For rootless Podman without subuid delegation, create
-a local `podman-compose.override.yml` next to `docker-compose.yml` with:
+prompts for a registry. For rootless Podman without subuid delegation, layer
+the small
+[podman-compose.override.yml](https://github.com/precogly/precogly/blob/main/podman-compose.override.yml)
+overlay on top of it. The overlay adds only:
 
-```yaml
-services:
-  db:
-    # Without subuid delegation a rootless user namespace has a single UID
-    # mapping (host uid -> container 0). The postgres entrypoint chowns
-    # /var/lib/postgresql/data to uid/gid 70, which then fails. Mapping uid 70
-    # back to the host user lets those writes succeed.
-    userns_mode: "keep-id:uid=70,gid=70"
-```
+- **`db.userns_mode: "keep-id:uid=70,gid=70"`** — maps the container's
+  postgres user (uid 70) to the host user. Without this, the postgres
+  entrypoint's `chown` on `/var/lib/postgresql/data` fails inside the
+  restricted user namespace.
 
-This file is host-specific and not checked into the repo — Docker users and
-hosts with subuid delegation don't need it. Layer it on top of the canonical
-stack with `-f`, as shown below. Everything else (image, build targets,
-mounts, ports, env) comes from `docker-compose.yml` unchanged.
+Docker users and hosts with subuid delegation don't need it. Everything else
+(image, build targets, mounts, ports, env) comes from `docker-compose.yml`
+unchanged.
 
 ## Bringing up the stack
 

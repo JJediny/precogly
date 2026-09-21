@@ -4,9 +4,6 @@
 .env.*
 !.env.example
 
-# Podman (host-specific compose overlay, see docs/getting-started/local-podman.md)
-podman-compose.override.yml
-
 # Python
 __pycache__/
 *.pyc
